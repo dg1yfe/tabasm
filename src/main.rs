@@ -10,10 +10,13 @@ mod errlog;
 mod expr;
 mod image;
 mod matcher;
+mod object;
 mod rules;
 mod symbols;
 mod table;
 mod limits;
+mod listing;
+mod macros;
 
 use cli::Options;
 use limits::*;
