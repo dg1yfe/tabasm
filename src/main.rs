@@ -6,6 +6,8 @@
 #![allow(dead_code)] // constants and helpers land ahead of their first use
 
 mod cli;
+mod expr;
+mod table;
 mod limits;
 
 use cli::Options;
