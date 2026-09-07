@@ -6,7 +6,12 @@
 #![allow(dead_code)] // constants and helpers land ahead of their first use
 
 mod cli;
+mod errlog;
 mod expr;
+mod image;
+mod matcher;
+mod rules;
+mod symbols;
 mod table;
 mod limits;
 
