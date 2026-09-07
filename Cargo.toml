@@ -1,0 +1,19 @@
+[package]
+name    = "tabasm"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Clean-room reimplementation of the TASM table-driven cross-assembler"
+
+[[bin]]
+name = "tabasm"
+path = "src/main.rs"
+
+# No dependencies, by intent: the assembler is pure std. Nothing here descends
+# from the original implementation -- see AGENTS.md.
+
+[profile.release]
+opt-level = 2
+# Deliberately NOT panic = "abort". The robustness suite treats an abort as a
+# crash, so the binary must unwind rather than SIGABRT if a panic ever escapes.
+panic = "unwind"
