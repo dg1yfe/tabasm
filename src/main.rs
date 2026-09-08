@@ -5,6 +5,7 @@
 
 #![allow(dead_code)] // constants and helpers land ahead of their first use
 
+mod asm;
 mod cli;
 mod errlog;
 mod expr;
@@ -84,7 +85,67 @@ fn main() {
         std::process::exit(EXIT_FILE);
     }
 
-    // M0: the skeleton stops here. Assembly proper arrives with M1.
+    // 9.5: a rejected TASMERRFORMAT warns once, on standard error, and the
+    // built-in layout is used instead.
+    let (fmt, warn) = errlog::Format::from_env(std::env::var("TASMERRFORMAT").ok().as_deref());
+    if let Some(w) = warn {
+        eprintln!("{}: {}", prog(&o), w);
+    }
+
+    // 1.5: failure to open the table is fatal, exit 3.
+    let table = match o.table_path(std::env::var("TASMTABS").ok().as_deref()) {
+        Some(path) => match table::Table::load(&path, o.table.as_deref().unwrap_or("")) {
+            Ok(t) => t,
+            Err(table::LoadError::Open(p)) => {
+                let _ = writeln!(out, "{}: cannot open table file {}", prog(&o), p);
+                let _ = out.flush();
+                std::process::exit(EXIT_FILE);
+            }
+            Err(table::LoadError::TooManyRows) => {
+                let _ = writeln!(out, "{}: Max number of instructions exceeded", prog(&o));
+                let _ = out.flush();
+                std::process::exit(EXIT_FATAL);
+            }
+            Err(table::LoadError::TooManyRegsets) => {
+                let _ = writeln!(out, "{}: Max number of registers exceeded", prog(&o));
+                let _ = out.flush();
+                std::process::exit(EXIT_FATAL);
+            }
+        },
+        None => {
+            let _ = writeln!(out, "{}: no instruction table selected", prog(&o));
+            let _ = out.flush();
+            std::process::exit(EXIT_FILE);
+        }
+    };
+
+    let source = o.source().unwrap().to_string();
+    let (base, base_warn) = o.base_name();
+    if let Some(w) = base_warn {
+        let _ = writeln!(out, "{}: {}", prog(&o), w);
+    }
+    let obj_name = o.out_name(1, ".obj", &base);
+    let lst_name = o.out_name(2, ".lst", &base);
+    let exp_name = o.out_name(3, ".exp", &base);
+    let sym_name = o.out_name(4, ".sym", &base);
+
+    let p = prog(&o);
+    let mut a = asm::Asm::new(o, table, fmt, p);
+    if let Err(code) = a.run(&source) {
+        let _ = write!(out, "{}", a.stdout);
+        let _ = writeln!(out, "{}: file access failure", p);
+        let _ = out.flush();
+        std::process::exit(code);
+    }
+
+    let _ = write!(out, "{}", a.stdout);
+    let count = format!("{}: Number of errors = {}\n", p, a.errors);
+    let _ = write!(out, "{}", count);
     let _ = out.flush();
-    std::process::exit(EXIT_OK);
+
+    a.write_outputs(&obj_name, &lst_name, &exp_name, &sym_name, &count);
+
+    // 1.8: status 1 whenever the error count is non-zero -- and the object and
+    // listing files are still written.
+    std::process::exit(if a.errors > 0 { EXIT_ERRORS } else { EXIT_OK });
 }

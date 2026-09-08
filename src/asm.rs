@@ -1,0 +1,1070 @@
+//! The two-pass assembler (the specification).
+
+use crate::cli::{ObjFormat, Options};
+use crate::errlog::{msg, Format};
+use crate::expr;
+use crate::image::Image;
+use crate::limits::*;
+use crate::listing;
+use crate::macros::Macros;
+use crate::matcher;
+use crate::rules::Enc;
+use crate::symbols::{Segment, Symbols};
+use crate::table::Table;
+
+struct Cond {
+    /// Whether this level's branch is being assembled.
+    active: bool,
+    /// Whether any branch at this level has been taken (so .ELSE knows).
+    taken: bool,
+}
+
+pub struct Asm {
+    pub o: Options,
+    pub table: Table,
+    pub syms: Symbols,
+    pub macs: Macros,
+    pub img: Image,
+    pub fmt: Format,
+    pub prog: &'static str,
+
+    pass: u8,
+    pc: u32,
+    pub errors: u32,
+    pub stdout: String,
+    pub lst: String,
+
+    // 4.5: these two take effect in pass 1 only and are NOT reset between
+    // passes, so on pass 2 a change is already in force from line 1.
+    local_char: u8,
+    comment_char: u8,
+    module: String,
+
+    ls_first: bool, // source .LSFIRST/.MSFIRST, for .WORD data only
+    segment: Segment,
+    pub end_addr: u32,
+    saw_end: bool,
+    cond: Vec<Cond>,
+    listing_on: bool,
+    codes: bool,
+    pub title: String,
+    pub sym_out: Option<String>,
+    pub avsym: bool,
+
+    file: String,
+    line_no: u32,
+    depth: usize,
+    /// Bytes emitted by the current statement, for the listing.
+    emitted: Vec<u8>,
+    line_pc: u32,
+}
+
+impl Asm {
+    pub fn new(o: Options, table: Table, fmt: Format, prog: &'static str) -> Asm {
+        let ignore_case = o.ignore_case;
+        let fill = o.fill.unwrap_or(0);
+        Asm {
+            table,
+            syms: Symbols::new(ignore_case),
+            macs: Macros::new(),
+            img: Image::new(fill),
+            fmt,
+            prog,
+            pass: 1,
+            pc: 0,
+            errors: 0,
+            stdout: String::new(),
+            lst: String::new(),
+            local_char: b'_',
+            comment_char: b';',
+            module: "noname".to_string(),
+            ls_first: true,
+            segment: Segment::Null,
+            end_addr: 0,
+            saw_end: false,
+            cond: Vec::new(),
+            listing_on: true,
+            codes: true,
+            title: String::new(),
+            sym_out: None,
+            avsym: false,
+            file: String::new(),
+            line_no: 0,
+            depth: 0,
+            emitted: Vec::new(),
+            line_pc: 0,
+            o,
+        }
+    }
+
+    // --- addressing ---------------------------------------------------------
+
+    /// 5.3: with .WORDADDRS the counter is in 16-bit words, but the image is
+    /// still byte-indexed.
+    fn byte_addr(&self) -> u32 {
+        if self.table.wordaddrs {
+            self.pc.wrapping_mul(2)
+        } else {
+            self.pc
+        }
+    }
+
+    /// 5.3: an odd byte count still advances the counter by a whole word.
+    fn advance(&mut self, bytes: u32) {
+        self.pc = if self.table.wordaddrs {
+            self.pc.wrapping_add((bytes + 1) / 2)
+        } else {
+            self.pc.wrapping_add(bytes)
+        };
+    }
+
+    fn emit(&mut self, bytes: &[u8]) {
+        if self.pass == 2 {
+            let mut a = self.byte_addr().wrapping_add(self.emitted.len() as u32);
+            for b in bytes {
+                if !self.img.write(a, *b) && !self.img.reported_out_of_range {
+                    self.img.reported_out_of_range = true;
+                    self.diag(msg::OUTSIDE_IMAGE, None);
+                }
+                a = a.wrapping_add(1);
+            }
+        }
+        self.emitted.extend_from_slice(bytes);
+    }
+
+    // --- diagnostics --------------------------------------------------------
+
+    fn skipping(&self) -> bool {
+        self.cond.last().map_or(false, |c| !c.active)
+    }
+
+    /// 9.5: diagnostics go to standard output AND into the listing. 4.6/9.5:
+    /// they are suppressed during pass 1 and while skipping a false branch.
+    fn diag(&mut self, message: &str, detail: Option<String>) {
+        if self.pass != 2 || self.skipping() {
+            return;
+        }
+        self.report(message, detail);
+    }
+
+    fn report(&mut self, message: &str, detail: Option<String>) {
+        let text = self.fmt.render(&self.file, self.line_no, message, detail.as_deref());
+        self.stdout.push_str(&text);
+        self.stdout.push('\n');
+        // The listing carries them too, and the goldens put them BEFORE the
+        // line they refer to -- 9.5's prose says after, the corpus says
+        // before, and the corpus wins.
+        if self.listing_on && !self.o.quiet {
+            self.lst.push_str(&text);
+            self.lst.push('\n');
+        }
+        self.errors += 1;
+    }
+
+    // --- driving ------------------------------------------------------------
+
+    pub fn run(&mut self, source: &str) -> Result<(), i32> {
+        // -d defines behave as #DEFINE would (1.3), and must survive both passes.
+        let defines: Vec<String> = self.o.defines.clone();
+        for d in &defines {
+            self.macs.define(d);
+        }
+
+        for pass in 1..=2u8 {
+            self.pass = pass;
+            self.pc = 0;
+            self.cond.clear();
+            self.saw_end = false;
+            self.segment = Segment::Null;
+            self.ls_first = true;
+            self.listing_on = true;
+            self.codes = true;
+            self.img.flush();
+            self.assemble_file(source, 0)?;
+            if !self.cond.is_empty() {
+                self.diag(msg::IMBALANCED_COND, None);
+            }
+            if !self.saw_end {
+                self.diag(msg::NO_END, None);
+            }
+            self.stdout
+                .push_str(&format!("{}: pass {} complete.\n", self.prog, pass));
+        }
+        self.img.flush();
+        Ok(())
+    }
+
+    fn assemble_file(&mut self, path: &str, depth: usize) -> Result<(), i32> {
+        let bytes = std::fs::read(path).map_err(|_| EXIT_FILE)?;
+        let text = String::from_utf8_lossy(&bytes).into_owned();
+        let (save_file, save_line, save_depth) = (self.file.clone(), self.line_no, self.depth);
+        // 4.8: line numbers restart at 1 in each file.
+        self.file = path.to_string();
+        self.depth = depth;
+        for (i, raw) in text.lines().enumerate() {
+            self.line_no = i as u32 + 1;
+            self.line(raw)?;
+        }
+        self.file = save_file;
+        self.line_no = save_line;
+        self.depth = save_depth;
+        Ok(())
+    }
+
+    /// 2.7: the line processing order, identical in both passes.
+    fn line(&mut self, raw: &str) -> Result<(), i32> {
+        // 1. A trailing carriage return is stripped here, so DOS-format source
+        //    assembles identically to Unix-format.
+        let src = raw.strip_suffix('\r').unwrap_or(raw);
+        self.line_pc = self.pc;
+        self.emitted.clear();
+
+        // 2. Expand macros.
+        let (expanded, macro_errs) = if self.skipping() {
+            (src.to_string(), Vec::new())
+        } else {
+            self.macs.expand(src, self.comment_char)
+        };
+        for e in macro_errs {
+            self.diag(e, None);
+        }
+
+        // -e lists the expanded form rather than the source as written.
+        let shown = if self.o.expand { expanded.clone() } else { src.to_string() };
+
+        // 3. Strip the comment.
+        let code = strip_comment(&expanded, self.comment_char);
+
+        // 4-6. Split and dispatch. `\` separates statements on one line (4.1).
+        for stmt in split_statements(&code) {
+            self.statement(&stmt)?;
+        }
+
+        self.list_line(&shown);
+        Ok(())
+    }
+
+    fn list_line(&mut self, shown: &str) {
+        // 2.1: pass 1 emits nothing -- it only decides where everything lands.
+        // The listing is produced in pass 2, alongside the bytes.
+        if self.pass != 2 || self.o.quiet || !self.listing_on {
+            return;
+        }
+        let skipped = self.skipping();
+        let bytes = std::mem::take(&mut self.emitted);
+        if !self.codes {
+            self.lst.push_str(&listing::line_nocodes(shown));
+            self.lst.push('\n');
+            return;
+        }
+        let first = bytes.len().min(listing::BYTES_PER_LINE);
+        self.lst.push_str(&listing::line(
+            self.line_no,
+            self.depth,
+            self.line_pc,
+            skipped,
+            &bytes[..first],
+            shown,
+        ));
+        self.lst.push('\n');
+        // 9.1: continuation lines repeat the line number, advance the address
+        // and leave the source column empty.
+        let mut off = first;
+        let unit = if self.table.wordaddrs { 2 } else { 1 };
+        while off < bytes.len() {
+            let n = (bytes.len() - off).min(listing::BYTES_PER_LINE);
+            let pc = self.line_pc.wrapping_add((off as u32) / unit);
+            self.lst
+                .push_str(&listing::continuation(self.line_no, self.depth, pc, &bytes[off..off + n]));
+            self.lst.push('\n');
+            off += n;
+        }
+    }
+
+    fn statement(&mut self, stmt: &str) -> Result<(), i32> {
+        let (label, mnem, operand) = split_statement(stmt, self.comment_char, self.local_char);
+        if mnem.is_empty() && label.is_none() {
+            return Ok(());
+        }
+
+        // 4.2: a directive begins with a non-letter. Both '.' and '#' are
+        // accepted for every directive, interchangeably.
+        let is_directive = !mnem.is_empty()
+            && !mnem.as_bytes()[0].is_ascii_alphabetic();
+        let dname = if is_directive {
+            let d = mnem.trim_start_matches(['.', '#']);
+            if d.is_empty() { mnem.to_ascii_uppercase() } else { d.to_ascii_uppercase() }
+        } else {
+            String::new()
+        };
+
+        // 4.6: while skipping, only the conditional directives are seen. No
+        // labels are defined, the counter does not advance, includes are not
+        // followed, macros are not defined, and diagnostics are suppressed.
+        if self.skipping() {
+            if is_directive
+                && matches!(dname.as_str(), "IF" | "IFDEF" | "IFNDEF" | "ELSE" | "ENDIF")
+            {
+                self.conditional(&dname, &operand);
+            } else if is_directive && matches!(dname.as_str(), "IF" | "IFDEF" | "IFNDEF") {
+                self.cond.push(Cond { active: false, taken: true });
+            }
+            return Ok(());
+        }
+
+        // 5. The label. 4.5: .EQU/.SET/= define the line's label themselves;
+        // any other label takes the current counter.
+        let defines_own = is_directive && matches!(dname.as_str(), "EQU" | "SET" | "=");
+        if let Some(name) = label.clone() {
+            if !defines_own {
+                self.define_label(&name, self.pc as i32);
+            }
+        }
+
+        if mnem.is_empty() {
+            return Ok(()); // a label alone is legal (4.1)
+        }
+        if is_directive {
+            self.directive(&dname, &operand, label.as_deref())?;
+        } else {
+            self.instruction(&mnem, &operand);
+        }
+        Ok(())
+    }
+
+    fn define_label(&mut self, raw: &str, value: i32) {
+        let (name, too_long) = Symbols::truncate(raw);
+        if too_long {
+            self.diag(msg::TOKEN_TOO_LONG, Some(name.clone()));
+        }
+        let (qualified, local) = Symbols::qualify(&name, self.local_char, &self.module);
+        if self.pass == 1 {
+            if !self.syms.define(&qualified, value, self.segment, local) {
+                // 10.3 / 1.4: gated on -a bit 0x04.
+                if self.o.strict & 0x04 != 0 {
+                    self.diag(msg::DUPLICATE_LABEL, Some(name));
+                }
+            }
+        } else {
+            // 2.1: the phase error is raised when the label is reached in pass
+            // 2 and its recorded value disagrees with the counter. The label
+            // KEEPS its pass-1 value, which is what later references see.
+            if let Some(prev) = self.syms.value(&qualified) {
+                if prev != value {
+                    self.diag(msg::MISALIGNED, Some(name));
+                }
+            }
+        }
+    }
+
+    fn eval(&mut self, text: &str) -> i32 {
+        let pc = self.pc as i32;
+        let compat = self.o.compatibility;
+        let lc = self.local_char;
+        let module = self.module.clone();
+        let syms = &self.syms;
+        let mut lookup = |n: &str| {
+            let (q, _) = Symbols::qualify(n, lc, &module);
+            syms.value(&q).or_else(|| syms.value(n))
+        };
+        let out = expr::eval(text, pc, compat, lc, &mut lookup);
+        let diags = out.diags;
+        let undefined = out.undefined;
+        for d in diags {
+            self.diag(d.msg, d.detail);
+        }
+        for name in undefined {
+            // 3.8: an ordinary forward reference is silent in pass 1 and
+            // `Label not found:` in pass 2 -- which is exactly what makes
+            // forward references work.
+            self.diag(msg::LABEL_NOT_FOUND, Some(name));
+        }
+        out.value
+    }
+
+    /// As `eval`, but for contexts where an unresolved name is an error on
+    /// BOTH passes -- 3.8's forward reference inside an .EQU.
+    fn eval_equate(&mut self, text: &str) -> i32 {
+        let pc = self.pc as i32;
+        let compat = self.o.compatibility;
+        let lc = self.local_char;
+        let module = self.module.clone();
+        let syms = &self.syms;
+        let mut lookup = |n: &str| {
+            let (q, _) = Symbols::qualify(n, lc, &module);
+            syms.value(&q).or_else(|| syms.value(n))
+        };
+        let out = expr::eval(text, pc, compat, lc, &mut lookup);
+        let diags = out.diags;
+        let undefined = out.undefined;
+        for d in diags {
+            self.diag(d.msg, d.detail);
+        }
+        for name in undefined {
+            if !self.skipping() {
+                self.report(msg::FORWARD_IN_EQUATE, Some(name));
+            }
+        }
+        out.value
+    }
+
+    // --- instructions -------------------------------------------------------
+
+    fn instruction(&mut self, mnem: &str, operand: &str) {
+        let m = match matcher::find(&self.table, mnem, operand, self.o.class_mask) {
+            Some(m) => m,
+            None => {
+                // 10.3: a mnemonic that matched no row at all is a bad
+                // instruction; a known mnemonic whose operands matched none is
+                // a bad argument.
+                let known = self
+                    .table
+                    .rows
+                    .iter()
+                    .any(|r| r.mnemonic == mnem.to_ascii_uppercase());
+                let (m, d) = if known {
+                    (msg::BAD_ARGUMENT, operand.trim().to_string())
+                } else {
+                    (msg::BAD_INSTRUCTION, mnem.to_ascii_uppercase())
+                };
+                self.diag(m, Some(d));
+                return;
+            }
+        };
+        let row = self.table.rows[m.row].clone();
+        if row.short_count {
+            self.diag(msg::SHORT_BYTE_COUNT, None);
+        }
+
+        let argt = m.args.clone();
+        let argv: Vec<i32> = argt.iter().map(|a| self.eval(a)).collect();
+
+        let mut e = Enc {
+            pcx: self.pc as i32,
+            opcode: m.opcode,
+            opcode_bytes: row.opcode_bytes,
+            arg_bytes: row.arg_bytes,
+            argval: argv.first().copied().unwrap_or(0),
+            shift: row.shift,
+            or: row.or,
+            argv,
+            argt,
+            vector: None,
+            diags: Vec::new(),
+        };
+        e.apply(row.rule, self.table.noargshift);
+        let diags = std::mem::take(&mut e.diags);
+        for d in diags {
+            self.diag(d.msg, d.detail);
+        }
+
+        let mut bytes = Vec::new();
+        // 2.5: opcode bytes go out least-significant first by default, most
+        // significant first if the table declared .MSFIRST. This is why Z80
+        // prefixed instructions carry the prefix in the HIGH byte.
+        for i in 0..e.opcode_bytes {
+            let sh = if self.table.msfirst {
+                8 * (e.opcode_bytes - 1 - i)
+            } else {
+                8 * i
+            };
+            bytes.push(((e.opcode >> sh) & 0xFF) as u8);
+        }
+        // 2.5: argument bytes come from a single value, least-significant
+        // first, UNCONDITIONALLY -- .MSFIRST never applies here. A rule that
+        // wants big-endian output swaps the value first, which is what SW does.
+        match &e.vector {
+            Some(v) => bytes.extend(v.iter().take(e.arg_bytes as usize)),
+            None => {
+                for i in 0..e.arg_bytes {
+                    bytes.push(((e.argval as u32 >> (8 * i as u32)) & 0xFF) as u8);
+                }
+            }
+        }
+
+        // Significant bits the instruction discards. 1.4 says this is gated on
+        // -a bit 0x02, but err-undef is assembled with no -a at all and its
+        // golden carries the diagnostic -- see the findings log
+        if e.arg_bytes > 0 && e.arg_bytes < 4 {
+            let discarded = (e.argval as u32) >> (8 * e.arg_bytes as u32);
+            if discarded != 0 {
+                self.diag(msg::UNUSED_MS_BYTE, Some(format!("{:X}", discarded)));
+            }
+        }
+
+        self.emit(&bytes);
+        let n = bytes.len() as u32;
+        self.advance(n);
+    }
+}
+
+/// 4.1: a `;` outside quotes begins a comment. The embedded comment character
+/// is always `;` and cannot be changed -- .COMMENTCHAR changes only the
+/// column-1 character.
+fn strip_comment(line: &str, comment_char: u8) -> String {
+    if line.as_bytes().first() == Some(&comment_char) || line.as_bytes().first() == Some(&b';') {
+        return String::new();
+    }
+    let b = line.as_bytes();
+    let mut quote: Option<u8> = None;
+    for (i, c) in b.iter().enumerate() {
+        match quote {
+            Some(q) => {
+                if *c == q {
+                    quote = None;
+                }
+            }
+            None => {
+                if *c == b'"' || *c == b'\'' {
+                    quote = Some(*c);
+                } else if *c == b';' {
+                    return line[..i].to_string();
+                }
+            }
+        }
+    }
+    line.to_string()
+}
+
+/// 4.1: `\` separates multiple statements on one line.
+fn split_statements(line: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    for c in line.chars() {
+        match quote {
+            Some(q) => {
+                cur.push(c);
+                if c == q {
+                    quote = None;
+                }
+            }
+            None => match c {
+                '"' | '\'' => {
+                    quote = Some(c);
+                    cur.push(c);
+                }
+                '\\' => out.push(std::mem::take(&mut cur)),
+                _ => cur.push(c),
+            },
+        }
+    }
+    out.push(cur);
+    out
+}
+
+/// 4.1: a label is recognised ONLY in column 1. The token ends at a space,
+/// tab, `\`, `:`, end of line -- or immediately after an `=`, which is what
+/// makes `*=$1000` work and what makes `LABEL=5` produce the label `LABEL=`.
+fn split_statement(stmt: &str, comment_char: u8, local_char: u8) -> (Option<String>, String, String) {
+    let b = stmt.as_bytes();
+    if b.is_empty() {
+        return (None, String::new(), String::new());
+    }
+    if b[0] == comment_char || b[0] == b';' {
+        return (None, String::new(), String::new());
+    }
+
+    let mut i = 0usize;
+    let mut label = None;
+    let c0 = b[0];
+    if c0.is_ascii_alphabetic() || c0 == b'_' || c0 == local_char {
+        while i < b.len() {
+            let c = b[i];
+            if c == b' ' || c == b'\t' || c == b'\\' || c == b':' {
+                break;
+            }
+            i += 1;
+            if c == b'=' {
+                break;
+            }
+        }
+        label = Some(stmt[..i].to_string());
+        if b.get(i) == Some(&b':') {
+            i += 1;
+        }
+    }
+
+    while i < b.len() && (b[i] == b' ' || b[i] == b'\t') {
+        i += 1;
+    }
+    let ms = i;
+    while i < b.len() && b[i] != b' ' && b[i] != b'\t' {
+        i += 1;
+    }
+    let mnem = stmt[ms..i].to_string();
+    let operand = stmt[i..].trim().to_string();
+    (label, mnem, operand)
+}
+
+/// Split an operand list on top-level commas, leaving quoted text alone --
+/// whitespace inside quotes is preserved (4.3).
+fn split_args(s: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    let mut quote: Option<char> = None;
+    for c in s.chars() {
+        match quote {
+            Some(q) => {
+                cur.push(c);
+                if c == q {
+                    quote = None;
+                }
+            }
+            None => match c {
+                '"' | '\'' => {
+                    quote = Some(c);
+                    cur.push(c);
+                }
+                ',' => out.push(std::mem::take(&mut cur)),
+                _ => cur.push(c),
+            },
+        }
+    }
+    if !cur.is_empty() || !out.is_empty() {
+        out.push(cur);
+    }
+    out
+}
+
+/// 4.3: .TEXT escapes. `\0`-`\3` followed by exactly two more octal digits
+/// gives an arbitrary byte; any other escaped character is passed through
+/// literally, so `\\` yields a backslash.
+fn text_bytes(s: &str) -> (Vec<u8>, bool) {
+    let b = s.as_bytes();
+    let mut out = Vec::new();
+    // A string that does not start with a quote is taken literally to end of
+    // line; one that opens but never closes is diagnosed.
+    let (body, quoted) = if b.first() == Some(&b'"') { (&b[1..], true) } else { (b, false) };
+    let mut closed = !quoted;
+    let mut i = 0usize;
+    while i < body.len() {
+        let c = body[i];
+        if quoted && c == b'"' {
+            closed = true;
+            break;
+        }
+        if c == b'\\' {
+            i += 1;
+            let e = match body.get(i) {
+                Some(e) => *e,
+                None => break, // trailing backslash
+            };
+            match e {
+                b'n' => out.push(b'\n'),
+                b'r' => out.push(b'\r'),
+                b't' => out.push(b'\t'),
+                b'b' => out.push(0x08),
+                b'f' => out.push(0x0C),
+                b'"' => out.push(b'"'),
+                b'0'..=b'3' => {
+                    let d1 = body.get(i + 1).copied().unwrap_or(0);
+                    let d2 = body.get(i + 2).copied().unwrap_or(0);
+                    if (b'0'..=b'7').contains(&d1) && (b'0'..=b'7').contains(&d2) {
+                        let v = ((e - b'0') << 6) | ((d1 - b'0') << 3) | (d2 - b'0');
+                        out.push(v);
+                        i += 2;
+                    } else {
+                        out.push(e);
+                    }
+                }
+                other => out.push(other),
+            }
+            i += 1;
+            continue;
+        }
+        out.push(c);
+        i += 1;
+    }
+    (out, closed)
+}
+
+impl Asm {
+    fn conditional(&mut self, name: &str, operand: &str) {
+        match name {
+            "IF" | "IFDEF" | "IFNDEF" => {
+                // 4.6: a skip at any enclosing level forces a skip regardless
+                // of the inner condition.
+                let outer = !self.skipping();
+                if self.cond.len() >= MAX_CONDITIONALS - 1 {
+                    self.diag(msg::COND_TOO_DEEP, None);
+                    self.cond.push(Cond { active: false, taken: true });
+                    return;
+                }
+                let want = if !outer {
+                    false
+                } else {
+                    match name {
+                        // 4.6: these test MACROS, not labels. A symbol defined
+                        // with .EQU is invisible to them.
+                        "IFDEF" => self.macs.defined(operand.trim()),
+                        "IFNDEF" => !self.macs.defined(operand.trim()),
+                        _ => self.eval(operand) != 0,
+                    }
+                };
+                self.cond.push(Cond { active: want, taken: want });
+            }
+            "ELSE" => match self.cond.last_mut() {
+                Some(c) => {
+                    c.active = !c.taken;
+                    c.taken = true;
+                }
+                None => self.diag(msg::ELSE_NO_MATCH, None),
+            },
+            "ENDIF" => {
+                if self.cond.pop().is_none() {
+                    self.diag(msg::ENDIF_NO_MATCH, None);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn directive(&mut self, name: &str, operand: &str, label: Option<&str>) -> Result<(), i32> {
+        match name {
+            // --- 4.3 data emission ------------------------------------------
+            "BYTE" | "DB" => {
+                let mut bytes = Vec::new();
+                for a in split_args(operand) {
+                    let t = a.trim();
+                    if t.starts_with('"') {
+                        // One byte per character; whitespace inside is kept.
+                        let (v, closed) = text_bytes(t);
+                        if !closed {
+                            self.diag(msg::NO_TERMINATING_QUOTE, Some(t.to_string()));
+                        }
+                        bytes.extend(v);
+                    } else {
+                        bytes.push(self.eval(t) as u8);
+                    }
+                }
+                self.emit(&bytes);
+                let n = bytes.len() as u32;
+                self.advance(n);
+            }
+            "WORD" | "DW" => {
+                let mut bytes = Vec::new();
+                for a in split_args(operand) {
+                    let v = self.eval(a.trim()) as u32;
+                    // 4.11: byte order follows the SOURCE .LSFIRST/.MSFIRST,
+                    // which is a different setting from the table directive of
+                    // the same name -- that one governs opcodes.
+                    if self.ls_first {
+                        bytes.push((v & 0xFF) as u8);
+                        bytes.push(((v >> 8) & 0xFF) as u8);
+                    } else {
+                        bytes.push(((v >> 8) & 0xFF) as u8);
+                        bytes.push((v & 0xFF) as u8);
+                    }
+                }
+                self.emit(&bytes);
+                let n = bytes.len() as u32;
+                self.advance(n);
+            }
+            "TEXT" => {
+                let (bytes, closed) = text_bytes(operand.trim());
+                if !closed {
+                    self.diag(msg::NO_TERMINATING_QUOTE, Some(operand.trim().to_string()));
+                }
+                self.emit(&bytes);
+                let n = bytes.len() as u32;
+                self.advance(n);
+            }
+            "FILL" => {
+                let args = split_args(operand);
+                // 4.3: the count is evaluated on both passes during parsing,
+                // so it must not depend on a forward reference. It is taken as
+                // a 16-bit value, so a negative count wraps -- .fill -1 fills
+                // 65535 bytes.
+                let count = (self.eval(args.first().map(|s| s.trim()).unwrap_or("0")) as u32) & 0xFFFF;
+                let value = match args.get(1) {
+                    Some(v) => self.eval(v.trim()) as u8,
+                    None => 0xFF,
+                };
+                let bytes = vec![value; count as usize];
+                self.emit(&bytes);
+                self.advance(count);
+            }
+            "BLOCK" | "DS" => {
+                // 4.3: reserves space by advancing the counter and emitting
+                // nothing, so the region does not appear in the object at all.
+                let n = self.eval(operand.trim()) as u32;
+                self.img.flush();
+                self.advance(n);
+            }
+            "CHK" => {
+                let start = self.eval(operand.trim()) as u32;
+                let here = self.byte_addr();
+                let mut sum = 0u8;
+                // A .CHK at address 0 is a guarded edge: it XORs just byte 0
+                // rather than running the range backwards, which in the
+                // original underflowed into a multi-billion-byte loop.
+                if here > start {
+                    for a in start..here {
+                        sum ^= self.img.read(a);
+                    }
+                } else {
+                    sum ^= self.img.read(start);
+                }
+                self.emit(&[sum]);
+                self.advance(1);
+            }
+
+            // --- 4.4 location ------------------------------------------------
+            "ORG" | "*=" | "$=" => {
+                let v = self.eval(operand.trim()) as u32;
+                // 4.4: a counter change flushes the current object record
+                // unless -c is in force. The operand is NOT range-checked here.
+                if !self.o.block {
+                    self.img.flush();
+                }
+                self.pc = v;
+            }
+
+            // --- 4.5 symbols ---------------------------------------------------
+            "EQU" | "=" => {
+                let v = self.eval_equate(operand.trim());
+                if let Some(l) = label {
+                    let (name, _) = Symbols::truncate(l.trim_end_matches('='));
+                    let (q, local) = Symbols::qualify(&name, self.local_char, &self.module);
+                    if self.pass == 1 {
+                        if !self.syms.define(&q, v, self.segment, local) {
+                            if self.o.strict & 0x04 != 0 {
+                                self.diag(msg::DUPLICATE_LABEL, Some(name));
+                            }
+                        }
+                    } else {
+                        self.syms.redefine(&q, v);
+                    }
+                }
+            }
+            "SET" => {
+                let v = self.eval(operand.trim());
+                if let Some(l) = label {
+                    let (name, _) = Symbols::truncate(l);
+                    let (q, _) = Symbols::qualify(&name, self.local_char, &self.module);
+                    // 4.5: .SET cannot create a symbol; the name must already
+                    // exist, typically from .EQU.
+                    if !self.syms.set(&q, v) {
+                        self.diag(msg::SET_PREEXIST, Some(name));
+                    }
+                }
+            }
+            "EXPORT" => {
+                if self.pass == 2 {
+                    for a in split_args(operand) {
+                        let (q, _) = Symbols::qualify(a.trim(), self.local_char, &self.module);
+                        self.syms.export(&q);
+                    }
+                }
+            }
+            "MODULE" => self.module = operand.trim().to_string(),
+            // 4.5: each takes the SECOND character of the operand, the
+            // convention being that the first is a quote. The character is not
+            // validated and no closing quote is required. Both take effect in
+            // pass 1 only and are not reset between passes.
+            "LOCALLABELCHAR" => {
+                if self.pass == 1 {
+                    if let Some(c) = operand.as_bytes().get(1) {
+                        self.local_char = *c;
+                    }
+                }
+            }
+            "COMMENTCHAR" => {
+                if self.pass == 1 {
+                    if let Some(c) = operand.as_bytes().get(1) {
+                        self.comment_char = *c;
+                    }
+                }
+            }
+
+            // --- 4.6 conditionals ---------------------------------------------
+            "IF" | "IFDEF" | "IFNDEF" | "ELSE" | "ENDIF" => self.conditional(name, operand),
+
+            // --- 4.7 macros ----------------------------------------------------
+            "DEFINE" => {
+                if let Some(e) = self.macs.define(operand) {
+                    self.diag(e, None);
+                }
+            }
+            "DEFCONT" => {
+                if let Some(e) = self.macs.defcont(operand) {
+                    self.diag(e, None);
+                }
+            }
+            "UNDEF" => {
+                // 4.7: originally this did nothing at all -- listed in the
+                // directive table but implemented in neither pass, so it
+                // parsed cleanly and silently kept the definition.
+                // --compatibility restores that silence.
+                if !self.o.compatibility {
+                    self.macs.undef(operand.trim());
+                }
+            }
+
+            // --- 4.8 inclusion --------------------------------------------------
+            "INCLUDE" => {
+                let path = operand.trim().trim_matches('"');
+                if self.depth + 1 >= MAX_INCLUDE_DEPTH {
+                    self.diag(msg::INCLUDE_TOO_DEEP, Some(path.to_string()));
+                } else {
+                    // 4.8: no path resolution of any kind -- opened exactly as
+                    // written, relative to the working directory.
+                    let d = self.depth + 1;
+                    self.assemble_file(path, d)?;
+                }
+            }
+
+            // --- 4.9 segments ----------------------------------------------------
+            "NSEG" => self.segment = Segment::Null,
+            "CSEG" => self.segment = Segment::Code,
+            "BSEG" => self.segment = Segment::Bit,
+            "XSEG" => self.segment = Segment::Extd,
+            "DSEG" => self.segment = Segment::Data,
+
+            // --- 4.10 listing control ---------------------------------------------
+            "LIST" => self.listing_on = true,
+            "NOLIST" => self.listing_on = false,
+            "CODES" => self.codes = true,
+            "NOCODES" => self.codes = false,
+            "PAGE" | "NOPAGE" | "EJECT" => {}
+            "TITLE" => self.title = operand.trim().trim_matches('"').to_string(),
+
+            // --- 4.11 miscellaneous -------------------------------------------------
+            "LSFIRST" => self.ls_first = true,
+            "MSFIRST" => self.ls_first = false,
+            "SYM" | "AVSYM" => {
+                if self.pass == 1 {
+                    self.avsym = name == "AVSYM";
+                    let n = operand.trim();
+                    if !n.is_empty() {
+                        self.sym_out = Some(n.to_string());
+                    } else if self.sym_out.is_none() {
+                        self.sym_out = Some(String::new());
+                    }
+                }
+            }
+            "ADDINSTR" => {
+                if self.pass == 1 {
+                    if self.table.rows.len() >= MAX_TABLE_ROWS {
+                        return Err(EXIT_FATAL);
+                    }
+                    if let Some(row) = crate::table::parse_row(operand) {
+                        self.table.rows.push(row);
+                    }
+                }
+            }
+            "ECHO" => {
+                if self.pass == 2 {
+                    let t = operand.trim();
+                    // 4.11: printed to standard error with NO trailing
+                    // newline. A non-quoted operand is evaluated and printed
+                    // as a decimal number.
+                    let s = if t.starts_with('"') {
+                        String::from_utf8_lossy(&text_bytes(t).0).into_owned()
+                    } else {
+                        format!("{}", self.eval(t))
+                    };
+                    eprint!("{}", s);
+                }
+            }
+            "END" => {
+                self.saw_end = true;
+                let t = operand.trim();
+                if !t.is_empty() {
+                    let v = self.eval(t);
+                    if !(0..=0xFFFF).contains(&v) {
+                        self.diag(msg::END_OUT_OF_RANGE, Some(t.to_string()));
+                    }
+                    // 4.11 / 8.5: masked to 16 bits, so the S9 record's
+                    // four-digit field cannot overflow.
+                    self.end_addr = (v as u32) & 0xFFFF;
+                }
+            }
+
+            _ => self.diag(msg::BAD_DIRECTIVE, Some(format!(".{}", name))),
+        }
+        Ok(())
+    }
+
+    /// 8.1: which regions the object writer sees. -c and -b collect everything
+    /// into one run from the lowest to the highest address used.
+    pub fn regions(&self) -> Vec<crate::image::Region> {
+        if self.o.block || self.o.format == ObjFormat::Binary && self.o.block {
+            self.img.block().into_iter().collect()
+        } else {
+            self.img.regions.clone()
+        }
+    }
+}
+
+impl Asm {
+    /// 9.6: the symbol file is ordered as the table is ordered. 2.1 says the
+    /// symbol table is sorted between passes; comparing the golden .sym and
+    /// -l label table against test51.asm's definition order shows that sort
+    /// is keyed on the FIRST CHARACTER ONLY and is stable, so `labimm` still
+    /// precedes `lab2` inside the 'l' bucket.
+    pub fn sorted_symbols(&self) -> Vec<&crate::symbols::Symbol> {
+        let mut v: Vec<&crate::symbols::Symbol> = self.syms.list.iter().collect();
+        v.sort_by_key(|s| s.name.as_bytes().first().copied().unwrap_or(0));
+        v
+    }
+
+    fn symbol_file(&self) -> String {
+        let mut s = String::new();
+        for sym in self.sorted_symbols() {
+            // 9.6: printf "AS %-16s  %s%04x" -- note the value is LOWER-case
+            // hex and a label above 0xFFFF prints more than four digits.
+            s.push_str(&format!(
+                "AS {:<16}  {}:{:04x}\n",
+                sym.name,
+                sym.segment.letter(),
+                sym.value
+            ));
+        }
+        s
+    }
+
+    /// 9.7 is entirely [unknown]: no golden case produces an export file, so
+    /// neither its layout nor its exact trigger is pinned. Recorded in
+    /// the findings log; this follows the symbol file's shape.
+    fn export_file(&self) -> String {
+        let mut s = String::new();
+        for sym in self.sorted_symbols().iter().filter(|s| s.exported) {
+            s.push_str(&format!("{:<16}  {:04x}\n", sym.name, sym.value));
+        }
+        s
+    }
+
+    pub fn write_outputs(&mut self, obj: &str, lst: &str, exp: &str, sym: &str, count: &str) {
+        let regions = self.regions();
+        let data = crate::object::write(
+            self.o.format,
+            &regions,
+            self.o.bytes_per_record as usize,
+            self.end_addr,
+        );
+        let _ = std::fs::write(obj, data);
+
+        // 1.3: -q suppresses the listing. The file is still created, empty.
+        let mut text = if self.o.quiet { String::new() } else { std::mem::take(&mut self.lst) };
+        if !self.o.quiet {
+            text.push_str(count);
+        }
+        let _ = std::fs::write(lst, text);
+
+        // 9.6: written when -s is given, or when the source used .SYM/.AVSYM,
+        // which also override the file name.
+        if self.o.symfile || self.sym_out.is_some() {
+            let name = match self.sym_out.as_deref() {
+                Some(n) if !n.is_empty() => n.to_string(),
+                _ => sym.to_string(),
+            };
+            let _ = std::fs::write(name, self.symbol_file());
+        }
+        let exported = self.syms.list.iter().any(|s| s.exported);
+        if exported {
+            let _ = std::fs::write(exp, self.export_file());
+        }
+    }
+}
