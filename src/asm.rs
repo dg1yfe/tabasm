@@ -1105,25 +1105,20 @@ impl Asm {
 }
 
 impl Asm {
-    /// 9.6: the symbol file is ordered as the table is ordered. 2.1 says the
-    /// symbol table is sorted between passes; comparing the golden .sym and
-    /// -l label table against test51.asm's definition order shows that sort
-    /// is keyed on the FIRST CHARACTER ONLY and is stable, so `labimm` still
-    /// precedes `lab2` inside the 'l' bucket.
+    /// The order symbols appear in the symbol file, the export file and the
+    /// -l/-ll label tables: a STABLE sort keyed on the first character only,
+    /// as 2.1 states.
+    ///
+    /// Verified against the 2001 binary on nine of the eleven reference
+    /// programs. Two -- 6805 and 6800 -- come out with one adjacent pair
+    /// transposed against this rule, which no comparison sort can produce; see
+    /// the findings log. Every golden vector agrees with the rule as written.
     pub fn sorted_symbols(&self) -> Vec<&crate::symbols::Symbol> {
         let mut v: Vec<&crate::symbols::Symbol> = self.syms.list.iter().collect();
         v.sort_by_key(|s| s.name.as_bytes().first().copied().unwrap_or(0));
         v
     }
 
-    /// 9.6: TWO formats, chosen by the trigger. `-s` and `.SYM` write the
-    /// plain form -- name in a 16-column field, two spaces, the value, nothing
-    /// else. `.AVSYM` writes the AVSIM51 form, which adds the `AS ` prefix and
-    /// the segment letter.
-    ///
-    /// In both, the value is lower-case hex MASKED TO 16 BITS and zero-padded
-    /// to exactly four digits, so a 32-bit label loses its high bits. The full
-    /// width survives only in the -l label table (9.8).
     fn symbol_file(&self) -> String {
         let mut s = String::new();
         for sym in self.sorted_symbols() {
@@ -1252,22 +1247,29 @@ impl Asm {
         out.push("Value    Type   Label".to_string());
         out.push("-----    ----   ------------------------------".to_string());
         for s in self.sorted_symbols() {
-            out.push(format!("{:<9}{:<7}{:<32}", format!("{:04X}", s.value), s.segment.letter(), s.name));
+            // The value field is the value followed by FIVE literal spaces,
+            // not a nine-column padded field: a 32-bit value prints eight
+            // digits and pushes the rest of the row right rather than being
+            // squeezed. Only visible when a value exceeds four digits.
+            out.push(format!("{:04X}     {:<7}{:<32}", s.value, s.segment.letter(), s.name));
         }
         out.push(String::new());
     }
 
-    /// 9.8: sixteen bytes per line over the written extent of the image,
-    /// rounded out to whole rows. Unwritten bytes inside it show the fill
-    /// value.
+    /// 9.8: sixteen bytes per line from the low watermark to the high one.
+    /// Unwritten bytes inside the span show the fill value, and the final row
+    /// is padded out to a full sixteen.
     fn hex_table(&self, out: &mut Vec<String>) {
         out.push(String::new());
         out.push("ADDR  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F".to_string());
         out.push("-".repeat(53));
         if let (Some(lo), Some(hi)) = (self.img.lo, self.img.hi) {
-            let (start, end) = (lo & !0xF, hi | 0xF);
-            let mut a = start;
-            while a <= end {
+            // Rows begin at the LOW WATERMARK itself, not rounded down to a
+            // 16-byte boundary, and step 16 from there -- so a program based at
+            // 0x0056 lists rows 0056, 0066, ... This is invisible on 8051,
+            // whose corpus starts at zero.
+            let mut a = lo;
+            while a <= hi {
                 let row: Vec<String> =
                     (0..16).map(|i| format!("{:02X}", self.img.read(a + i))).collect();
                 out.push(format!("{:04X}  {}", a, row.join(" ")));
