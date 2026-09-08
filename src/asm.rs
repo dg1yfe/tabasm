@@ -62,6 +62,11 @@ pub struct Asm {
     line_pc: u32,
     /// Diagnostics that belong AFTER their listing line rather than before it.
     pending: Vec<String>,
+    /// Names defined so far in THIS pass. A duplicate has to be detected per
+    /// pass: every label is legitimately defined once per pass, so comparing
+    /// against the symbol table alone cannot tell a redefinition from pass 2
+    /// simply revisiting the line.
+    seen_this_pass: std::collections::HashSet<String>,
 }
 
 impl Asm {
@@ -100,6 +105,7 @@ impl Asm {
             emitted: Vec::new(),
             line_pc: 0,
             pending: Vec::new(),
+            seen_this_pass: std::collections::HashSet::new(),
             o,
         }
     }
@@ -208,6 +214,7 @@ impl Asm {
         for pass in 1..=2u8 {
             self.pass = pass;
             self.pc = 0;
+            self.seen_this_pass.clear();
             self.cond.clear();
             self.saw_end = false;
             self.segment = Segment::Null;
@@ -373,13 +380,17 @@ impl Asm {
             self.diag(msg::TOKEN_TOO_LONG, Some(name.clone()));
         }
         let (qualified, local) = Symbols::qualify(&name, self.local_char, &self.module);
-        if self.pass == 1 {
-            if !self.syms.define(&qualified, value, self.segment, local) {
-                // 10.3 / 1.4: gated on -a bit 0x04.
-                if self.o.strict & 0x04 != 0 {
-                    self.diag(msg::DUPLICATE_LABEL, Some(name));
-                }
+        // 1.4 bit 0x04, on by default. Reported in pass 2, where diagnostics
+        // are live; the pass-1 detection alone could never print anything.
+        if !self.seen_this_pass.insert(qualified.clone()) {
+            if self.o.strict & 0x04 != 0 {
+                self.diag(msg::DUPLICATE_LABEL, Some(name.clone()));
             }
+            // 4.5: the second definition is discarded -- first wins.
+            return;
+        }
+        if self.pass == 1 {
+            self.syms.define(&qualified, value, self.segment, local);
         } else {
             // 2.1: the phase error is raised when the label is reached in pass
             // 2 and its recorded value disagrees with the counter. The label
@@ -402,7 +413,8 @@ impl Asm {
             let (q, _) = Symbols::qualify(n, lc, &module);
             syms.value(&q).or_else(|| syms.value(n))
         };
-        let out = expr::eval(text, pc, compat, lc, &mut lookup);
+        let strict = self.o.strict;
+        let out = expr::eval_strict(text, pc, compat, lc, strict, &mut lookup);
         let diags = out.diags;
         let undefined = out.undefined;
         for d in diags {
@@ -863,12 +875,12 @@ impl Asm {
                 if let Some(l) = label {
                     let (name, _) = Symbols::truncate(l.trim_end_matches('='));
                     let (q, local) = Symbols::qualify(&name, self.local_char, &self.module);
-                    if self.pass == 1 {
-                        if !self.syms.define(&q, v, self.segment, local) {
-                            if self.o.strict & 0x04 != 0 {
-                                self.diag(msg::DUPLICATE_LABEL, Some(name));
-                            }
+                    if !self.seen_this_pass.insert(q.clone()) {
+                        if self.o.strict & 0x04 != 0 {
+                            self.diag(msg::DUPLICATE_LABEL, Some(name));
                         }
+                    } else if self.pass == 1 {
+                        self.syms.define(&q, v, self.segment, local);
                     } else {
                         self.syms.redefine(&q, v);
                     }

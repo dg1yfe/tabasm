@@ -51,7 +51,9 @@ impl Default for Options {
     fn default() -> Self {
         Options {
             table: None,
-            strict: 0,
+            // 1.4: the mask is NOT all opt-in. Its default is 0x06, so the
+            // unused-argument-bytes and duplicate-label checks run without -a.
+            strict: 0x06,
             format: ObjFormat::IntelHex,
             block: false,
             defines: Vec::new(),
@@ -165,7 +167,8 @@ impl Options {
             return;
         }
         match first.to_ascii_lowercase() {
-            'a' => self.strict = if rest.is_empty() { 0x0F } else { hex(rest) },
+            // 1.4: -a<xx> REPLACES the mask; a bare -a sets all four bits.
+            'a' => self.strict = if rest.is_empty() { 0xFF } else { hex(rest) },
             'b' => {
                 // 8.1: -b selects binary AND turns on block mode; a bare -g3
                 // selects the format only.
@@ -204,11 +207,14 @@ impl Options {
             'q' => self.quiet = true,
             's' => self.symfile = true,
             't' => self.table = Some(rest.to_string()),
-            // 1.3 calls 1 the default, which is the mask when -x is ABSENT.
-            // A bare -x enables every extended class: the corpus assembles
-            // tasm48 with `-48 -x` and its golden emits class-2, class-4 and
-            // class-8 rows, which a mask of 1 would exclude.
-            'x' => self.class_mask = if rest.is_empty() { 0xFF } else { hex(rest) },
+            // 1.3: a bare -x enables ALL classes; -x<d> sets the mask to the
+            // single hex digit <d>. When -x is absent the mask is 1.
+            'x' => {
+                self.class_mask = match rest.chars().next().and_then(|c| c.to_digit(16)) {
+                    Some(d) => d,
+                    None => 0xFF,
+                }
+            }
             'y' => self.timing = true,
             'z' => self.debug = true,
             _ => warnings.push(format!("unrecognized option: -{}", body)),

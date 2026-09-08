@@ -57,6 +57,9 @@ pub struct Eval<'a> {
     lookup: &'a mut dyn FnMut(&str) -> Option<i32>,
     diags: Vec<Diag>,
     undefined: Vec<String>,
+    /// -a bit 0x08 (1.4): report an operator used where a unary one was
+    /// expected. Off by default; a bare -a turns it on.
+    check_non_unary: bool,
 }
 
 /// Evaluate `text`. `pc` is the counter at the start of the current statement
@@ -68,6 +71,17 @@ pub fn eval(
     local_char: u8,
     lookup: &mut dyn FnMut(&str) -> Option<i32>,
 ) -> Outcome {
+    eval_strict(text, pc, compat, local_char, 0, lookup)
+}
+
+pub fn eval_strict(
+    text: &str,
+    pc: i32,
+    compat: bool,
+    local_char: u8,
+    strict: u32,
+    lookup: &mut dyn FnMut(&str) -> Option<i32>,
+) -> Outcome {
     let mut e = Eval {
         s: text.as_bytes(),
         pos: 0,
@@ -77,6 +91,7 @@ pub fn eval(
         lookup,
         diags: Vec::new(),
         undefined: Vec::new(),
+        check_non_unary: strict & 0x08 != 0,
     };
     let value = if compat { e.accumulator() } else { e.expr(1) };
     Outcome { value, diags: e.diags, undefined: e.undefined }
@@ -94,6 +109,14 @@ impl<'a> Eval<'a> {
             self.pos += 1;
         }
     }
+    /// An expression that opens with something that is not a value opens with
+    /// a binary operator. 10.3 gives the wording; 1.4 bit 0x08 gates it.
+    fn non_unary_at_start(&mut self) {
+        if self.check_non_unary && self.peek().is_some() {
+            self.err("Non-unary operator at beginning of expression.", None);
+        }
+    }
+
     fn err(&mut self, msg: &'static str, detail: Option<String>) {
         self.diags.push(Diag { msg, detail });
     }
@@ -103,7 +126,10 @@ impl<'a> Eval<'a> {
     fn expr(&mut self, min_prec: u8) -> i32 {
         let mut lhs = match self.value() {
             Some(v) => v,
-            None => return 0,
+            None => {
+                self.non_unary_at_start();
+                return 0;
+            }
         };
         loop {
             let save = self.pos;
@@ -202,6 +228,7 @@ impl<'a> Eval<'a> {
                     continue;
                 }
                 self.pos = save;
+                self.non_unary_at_start();
             }
             let save = self.pos;
             if let Some((op, len)) = self.peek_binop() {
