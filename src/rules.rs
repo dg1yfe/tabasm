@@ -25,6 +25,8 @@ pub struct Enc {
     /// index form, which needs five argument bytes and so cannot fit a value.
     pub vector: Option<Vec<u8>>,
     pub diags: Vec<Diag>,
+    /// The literal -<nn> selector text. 7.20's arp_val compares against it.
+    pub selector: String,
 }
 
 impl Enc {
@@ -83,6 +85,21 @@ impl Enc {
             table::CS => self.cs(),
             table::SW => self.sw(),
             table::R3REL => self.r3rel(),
+            table::T1 => { let s = self.selector.clone(); self.t1(&s) }
+            table::TD => { let s = self.selector.clone(); self.td(&s) }
+            table::TL => self.tl(),
+            table::T5 => self.t5(),
+            table::TA => { let s = self.selector.clone(); self.ta(&s) }
+            table::SU => self.su(),
+            table::R2 => self.r2(),
+            table::I1 => self.i1(),
+            table::I2 => self.short_long(1, self.shift),
+            table::I3 => self.short_long(2, 0),
+            table::I4 => self.i4(),
+            table::I5 => self.i5(),
+            table::I6 => self.i6(),
+            table::I7 => self.short_long(0, 0),
+            table::I8 => self.i8(),
             // Phase B and the unexercised 7.25 rules are not implemented yet.
             // 10.3: this is exactly what `Invalid MODOP.` is for.
             _ => self.err("Invalid MODOP."),
@@ -270,5 +287,312 @@ impl Enc {
                 | (((self.arg(1) as u32) & 0xFF) << 8)
                 | (((d as u32) & 0xFF) << 16)) as i32;
         }
+    }
+}
+
+// --- Phase B: shared helpers (7.20) ----------------------------------------
+
+impl Enc {
+    /// `shift_and`: evaluate, shift left, mask, range-check.
+    ///
+    /// The SHIFT column carries TWO fields here. Only the low nibble is a
+    /// shift count; a non-zero HIGH nibble means "invert the masked bit
+    /// field", a kludge for the TMS320C25 BIT instruction whose operand counts
+    /// from the opposite end. The range check compares before and after
+    /// masking, so it fires whenever the shifted value has bits outside the
+    /// mask.
+    fn shift_and(&mut self, i: usize, shift: u32, mask: u32) -> u32 {
+        let invert = shift & 0xF0;
+        let count = shift & 0x0F;
+        let shifted = ((self.arg(i) as u32) & 0xFFFF) << count;
+        let result = shifted & mask;
+        if result != shifted {
+            self.range(i);
+        }
+        if invert != 0 {
+            (!shifted) & mask
+        } else {
+            result
+        }
+    }
+
+    /// `arp_val`: the auxiliary-register number, whose width depends on the
+    /// SELECTED TABLE rather than on the table's contents.
+    ///
+    /// 7.20: the comparison is against the literal text of the -<nn> selector.
+    /// This is the only place in the assembler where behaviour depends on
+    /// which table was NAMED -- copying tasm3225.tab to tasm9999.tab and
+    /// assembling `LAR 5,10` is clean under -3225 and out of range under
+    /// -9999, with identical table bytes. It cannot be derived from the .tab
+    /// file, so it is special-cased on the selector.
+    fn arp_val(&mut self, i: usize, selector: &str) -> u32 {
+        let value = (self.arg(i) as u32) & 0xFFFF;
+        let result = if selector == "3225" { value & 7 } else { value & 1 };
+        if result != value {
+            let detail = self.argt.get(i).cloned();
+            self.diags.push(Diag { msg: "Range of ARP argument exceeded.", detail });
+        }
+        result
+    }
+
+    /// `isargvalid`: per-field validation against a slice of the OR mask. For
+    /// the 8096 rules the OR column is a validation mask, not a value to OR
+    /// in -- tasm96.tab's `00FeFeFe` is three 8-bit fields whose low bit must
+    /// be clear, because those operands are even-aligned register pairs.
+    fn isargvalid(&mut self, i: usize, mask: u32, startbit: u32, width: u32) {
+        let widthmask: u32 = if width >= 32 { u32::MAX } else { (1u32 << width) - 1 };
+        let valid = if mask != 0 { widthmask & (mask >> startbit) } else { widthmask };
+        let mut v = self.arg(i) as u32;
+        if self.arg(i) < 0 {
+            v &= widthmask; // ignore sign extension
+        }
+        if v != (v & valid) {
+            let detail = self.argt.get(i).cloned();
+            // Note the lower case, distinct from the shared single-operand
+            // check's "Range of argument exceeded.".
+            self.diags.push(Diag { msg: "range of argument exceeded.", detail });
+        }
+    }
+
+    // --- 7.22 TMS320 --------------------------------------------------------
+
+    fn t1(&mut self, sel: &str) {
+        let arg0 = self.shift_and(0, self.shift, self.or);
+        let arp = if self.argv.len() > 1 { self.arp_val(1, sel) } else { 0 };
+        self.opcode |= arp | arg0;
+        self.argval = 0;
+    }
+
+    fn td(&mut self, sel: &str) {
+        let dma = self.shift_and(0, 0, 0x7F); // 7-bit direct address, no shift
+        let arg1 = if self.argv.len() > 1 {
+            self.shift_and(1, self.shift, self.or)
+        } else {
+            0
+        };
+        let _ = sel;
+        self.opcode |= dma | arg1;
+        self.argval = 0;
+    }
+
+    fn tl(&mut self) {
+        let arg0 = (self.arg(0) as u32) & 0xFFFF;
+        self.argval = Self::swap16(arg0);
+        if self.argv.len() > 1 {
+            let arg1 = self.shift_and(1, self.shift, self.or);
+            self.opcode |= arg1;
+        }
+    }
+
+    fn t5(&mut self) {
+        let arg1 = (self.arg(1) as u32) & 0xFFFF;
+        self.argval = Self::swap16(arg1);
+        let arg0 = self.shift_and(0, self.shift, self.or);
+        self.opcode |= arg0;
+    }
+
+    fn ta(&mut self, sel: &str) {
+        // The register number lands at bit 8 -- the opcode's HIGH byte --
+        // where T1 places it at bit 0.
+        let arp = self.arp_val(0, sel) << 8;
+        let arg1 = if self.argv.len() > 1 {
+            self.shift_and(1, self.shift, self.or)
+        } else {
+            0
+        };
+        self.opcode |= arp | arg1;
+        self.argval = 0;
+    }
+
+    // --- 7.23 TMS7000 -------------------------------------------------------
+
+    /// The only rule that SUBTRACTS from the opcode, and the only one whose
+    /// range limit is a literal rather than a mask from the table. It exists
+    /// for TRAP, whose 24 vectors occupy descending opcodes. The check is
+    /// after the subtraction, so the opcode has already moved when it fires.
+    fn su(&mut self) {
+        let arg = self.arg(0) as u32;
+        self.opcode = self.opcode.wrapping_sub(arg);
+        if self.arg(0) > 23 {
+            self.range(0);
+        }
+        self.argval = 0;
+    }
+
+    // --- 7.24 Intel 8096 -----------------------------------------------------
+
+    /// As R1 but two bytes wide, and with NO range check at all: a too-large
+    /// displacement is silently truncated by the emitter.
+    fn r2(&mut self) {
+        self.argval = self.delta(self.argval);
+    }
+
+    fn i1(&mut self) {
+        let argc = self.argv.len();
+        let ab = self.arg_bytes;
+        let g = |e: &Enc, i: usize| (e.arg(i) as u32) & 0xFF;
+        // Operands are emitted in REVERSE order: the 8096 encodes its
+        // destination last.
+        self.argval = match (argc, ab) {
+            (1, _) => {
+                self.isargvalid(0, self.or, 0, 8);
+                self.argval
+            }
+            (2, 2) => {
+                self.isargvalid(1, self.or, 0, 8);
+                self.isargvalid(0, self.or, 8, 8);
+                (g(self, 1) | (g(self, 0) << 8)) as i32
+            }
+            (2, _) => {
+                self.isargvalid(1, self.or, 0, 16);
+                self.isargvalid(0, self.or, 16, 8);
+                (((self.arg(1) as u32) & 0xFFFF) | (g(self, 0) << 16)) as i32
+            }
+            (3, 3) => {
+                self.isargvalid(2, self.or, 0, 8);
+                self.isargvalid(1, self.or, 8, 8);
+                self.isargvalid(0, self.or, 16, 8);
+                (g(self, 2) | (g(self, 1) << 8) | (g(self, 0) << 16)) as i32
+            }
+            (3, _) => {
+                self.isargvalid(2, self.or, 0, 16);
+                self.isargvalid(1, self.or, 16, 8);
+                self.isargvalid(0, self.or, 24, 8);
+                (((self.arg(2) as u32) & 0xFFFF) | (g(self, 1) << 16) | (g(self, 0) << 24)) as i32
+            }
+            _ => {
+                self.isargvalid(3, self.or, 0, 8);
+                self.isargvalid(2, self.or, 8, 8);
+                self.isargvalid(1, self.or, 16, 8);
+                self.isargvalid(0, self.or, 24, 8);
+                (g(self, 3) | (g(self, 2) << 8) | (g(self, 1) << 16) | (g(self, 0) << 24)) as i32
+            }
+        };
+        // Unconditionally. Here SHIFT is neither a shift nor an ordinary OR
+        // value: it sets the low bit of the first argument byte, selecting the
+        // 8096's auto-increment addressing modes.
+        self.argval = (self.argval as u32 | self.shift) as i32;
+    }
+
+    /// I1's three-operand case with the middle two exchanged. One row: TIJMP.
+    fn i8(&mut self) {
+        if self.argv.len() == 3 && self.arg_bytes == 3 {
+            let g = |e: &Enc, i: usize| (e.arg(i) as u32) & 0xFF;
+            self.argval = (g(self, 1) | (g(self, 2) << 8) | (g(self, 0) << 16)) as i32;
+        }
+    }
+
+    /// I2, I3 and I7 shorten the instruction when the tested address fits in
+    /// one byte, differing only in which operand is tested. Note the
+    /// convention is the OPPOSITE of the 6502 and Motorola zero-page rules:
+    /// the table declares the LONG form and the rule rewrites it short.
+    fn short_long(&mut self, tested: usize, xor: u32) {
+        let argc = self.argv.len();
+        let short = ((self.arg(tested) as u32) & 0xFFFF) < 256;
+        // Operands pack in reverse, destination last, exactly as I1 does. In
+        // the long form the tested operand contributes two bytes instead of
+        // one and the opcode is left alone.
+        let mut v: u32 = 0;
+        for i in 0..argc {
+            if !short && i == tested {
+                v = (v << 16) | ((self.arg(i) as u32) & 0xFFFF);
+            } else {
+                v = (v << 8) | ((self.arg(i) as u32) & 0xFF);
+            }
+        }
+        self.argval = v as i32;
+        if short {
+            self.opcode = ((self.opcode >> 8) & 0xFFFC) ^ xor;
+            self.opcode_bytes = self.opcode_bytes.saturating_sub(1);
+            self.arg_bytes = argc as u8;
+        }
+    }
+
+    /// Jump on bit: a byte address, a bit number folded into the opcode's low
+    /// three bits, and a relative target.
+    fn i4(&mut self) {
+        let d = self.delta(self.arg(2));
+        let bit = self.arg(1);
+        if !(-128..=127).contains(&d) {
+            self.argval = 0;
+            self.err("range of relative branch exceeded.");
+        } else if bit > 7 {
+            self.argval = 0;
+            self.err("range of argument exceeded.");
+        } else {
+            self.argval = (((self.arg(0) as u32) & 0xFF) | (((d as u32) & 0xFF) << 8)) as i32;
+            self.opcode |= bit as u32;
+        }
+    }
+
+    /// 11-bit PC-relative, carried INSIDE the opcode. The only rule whose
+    /// diagnostic detail is the computed offset rather than the operand text.
+    fn i5(&mut self) {
+        let d = self.delta(self.arg(0));
+        if !(-1024..=1023).contains(&d) {
+            let detail = Some(format!("offset={}", d));
+            self.diags.push(Diag { msg: "range of relative branch exceeded.", detail });
+        } else {
+            self.opcode |= (d as u32) & 0x07FF;
+        }
+        self.argval = 0;
+    }
+
+    /// Indexed addressing, and the only user of the byte-vector output path:
+    /// its four-operand long form needs five argument bytes, which does not
+    /// fit a 32-bit value.
+    fn i6(&mut self) {
+        let argc = self.argv.len();
+        if argc < 2 {
+            return;
+        }
+        // A negative index in -128..-1 is biased into 128..255 first, so it
+        // still fits one byte; the form is short when the index is then below
+        // 256.
+        let raw = self.arg(argc - 2);
+        let idx = if (-128..0).contains(&raw) {
+            (raw + 256) as u32
+        } else {
+            raw as u32
+        };
+        let short = idx < 256;
+        let g = |e: &Enc, i: usize| (e.arg(i) as u32) & 0xFF;
+        let base = argc - 1;
+
+        if argc == 4 {
+            let mut v: Vec<u8> = Vec::new();
+            if short {
+                v.push(g(self, base) as u8);
+                v.push(idx as u8);
+                v.push(g(self, 1) as u8);
+                v.push(g(self, 0) as u8);
+                self.arg_bytes = self.arg_bytes.saturating_sub(1);
+            } else {
+                // The forced low bit is how the 8096 distinguishes long-index
+                // from short-index encodings at run time.
+                v.push((g(self, base) | 1) as u8);
+                v.push((idx & 0xFF) as u8);
+                v.push(((idx >> 8) & 0xFF) as u8);
+                v.push(g(self, 1) as u8);
+                v.push(g(self, 0) as u8);
+            }
+            self.vector = Some(v);
+            return;
+        }
+
+        let mut v: u32;
+        if short {
+            v = g(self, base) | (idx << 8);
+            self.arg_bytes = self.arg_bytes.saturating_sub(1);
+            if argc == 3 {
+                v |= g(self, 0) << 16;
+            }
+        } else {
+            v = (g(self, base) | 1) | (idx << 8);
+            if argc == 3 {
+                v |= g(self, 0) << 24;
+            }
+        }
+        self.argval = v as i32;
     }
 }

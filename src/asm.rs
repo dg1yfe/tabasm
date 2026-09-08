@@ -125,6 +125,25 @@ impl Asm {
         };
     }
 
+    /// Emit a statement's bytes and advance the counter over them.
+    ///
+    /// With .WORDADDRS an odd byte count still advances a whole word, which
+    /// leaves a pad byte inside that word. The golden object for tms-wordaddr
+    /// is a single 20-byte record, so that pad belongs to the emitted region
+    /// rather than breaking it -- touching it keeps the run contiguous and
+    /// carries the image's own fill value. It is NOT added to the listing:
+    /// line 16 there shows `03` alone.
+    fn emit_and_advance(&mut self, bytes: &[u8]) {
+        self.emit(bytes);
+        if self.table.wordaddrs && self.emitted.len() % 2 == 1 && self.pass == 2 {
+            let a = self.byte_addr().wrapping_add(self.emitted.len() as u32);
+            let fill = self.img.read(a);
+            self.img.write(a, fill);
+        }
+        let n = self.emitted.len() as u32;
+        self.advance(n);
+    }
+
     fn emit(&mut self, bytes: &[u8]) {
         if self.pass == 2 {
             let mut a = self.byte_addr().wrapping_add(self.emitted.len() as u32);
@@ -467,6 +486,7 @@ impl Asm {
             argt,
             vector: None,
             diags: Vec::new(),
+            selector: self.table.selector.clone(),
         };
         e.apply(row.rule, self.table.noargshift);
         let diags = std::mem::take(&mut e.diags);
@@ -501,16 +521,18 @@ impl Asm {
         // Significant bits the instruction discards. 1.4 says this is gated on
         // -a bit 0x02, but err-undef is assembled with no -a at all and its
         // golden carries the diagnostic -- see the findings log
-        if e.arg_bytes > 0 && e.arg_bytes < 4 {
+        // A negative value is sign-extended, and those high bits are not
+        // "unused data" -- test96.asm's backward `lcall` produces a negative
+        // 16-bit displacement whose top half is all ones, and the corpus
+        // reports nothing there.
+        if e.arg_bytes > 0 && e.arg_bytes < 4 && e.argval > 0 {
             let discarded = (e.argval as u32) >> (8 * e.arg_bytes as u32);
             if discarded != 0 {
                 self.diag(msg::UNUSED_MS_BYTE, Some(format!("{:X}", discarded)));
             }
         }
 
-        self.emit(&bytes);
-        let n = bytes.len() as u32;
-        self.advance(n);
+        self.emit_and_advance(&bytes);
     }
 }
 
@@ -754,9 +776,7 @@ impl Asm {
                         bytes.push(self.eval(t) as u8);
                     }
                 }
-                self.emit(&bytes);
-                let n = bytes.len() as u32;
-                self.advance(n);
+                self.emit_and_advance(&bytes);
             }
             "WORD" | "DW" => {
                 let mut bytes = Vec::new();
@@ -773,18 +793,14 @@ impl Asm {
                         bytes.push((v & 0xFF) as u8);
                     }
                 }
-                self.emit(&bytes);
-                let n = bytes.len() as u32;
-                self.advance(n);
+                self.emit_and_advance(&bytes);
             }
             "TEXT" => {
                 let (bytes, closed) = text_bytes(operand.trim());
                 if !closed {
                     self.diag(msg::NO_TERMINATING_QUOTE, Some(operand.trim().to_string()));
                 }
-                self.emit(&bytes);
-                let n = bytes.len() as u32;
-                self.advance(n);
+                self.emit_and_advance(&bytes);
             }
             "FILL" => {
                 let args = split_args(operand);
@@ -798,8 +814,7 @@ impl Asm {
                     None => 0xFF,
                 };
                 let bytes = vec![value; count as usize];
-                self.emit(&bytes);
-                self.advance(count);
+                self.emit_and_advance(&bytes);
             }
             "BLOCK" | "DS" => {
                 // 4.3: reserves space by advancing the counter and emitting
@@ -822,8 +837,7 @@ impl Asm {
                 } else {
                     sum ^= self.img.read(start);
                 }
-                self.emit(&[sum]);
-                self.advance(1);
+                self.emit_and_advance(&[sum]);
             }
 
             // --- 4.4 location ------------------------------------------------
