@@ -100,6 +100,20 @@ impl Enc {
             table::I6 => self.i6(),
             table::I7 => self.short_long(0, 0),
             table::I8 => self.i8(),
+            // 7.25 -- unexercised; see the note on each.
+            table::T2 => self.t2(),
+            table::T3 => self.t3(),
+            table::T4 => self.t4(),
+            table::T6 => self.t6(),
+            table::A3 => self.a3(),
+            table::CN => self.cn(false),
+            table::C5 => self.cn(true),
+            table::SZ => self.sz(),
+            table::SB => self.sb(),
+            table::R3 => self.r3(),
+            table::ZW => self.zw(),
+            table::ZD => self.zd(),
+            table::ZL => self.zl(),
             // Phase B and the unexercised 7.25 rules are not implemented yet.
             // 10.3: this is exactly what `Invalid MODOP.` is for.
             _ => self.err("Invalid MODOP."),
@@ -594,5 +608,195 @@ impl Enc {
             }
         }
         self.argval = v as i32;
+    }
+}
+
+// --- 7.25: rules no shipped table selects ----------------------------------
+//
+// "They are described from the code alone; treat any implementation as
+// unverified." Nothing in the corpus reaches these, so nothing here is
+// validated by the acceptance run -- they are written to the spec's prose and
+// recorded as unverified in the findings log.
+
+impl Enc {
+    /// TMS9900. With two operands the first becomes a byte-swapped 16-bit
+    /// argument and the second's low nibble is OR-ed into the opcode; with
+    /// one, that operand's low nibble is OR-ed in.
+    fn t2(&mut self) {
+        if self.argv.len() >= 2 {
+            self.argval = Self::swap16((self.arg(0) as u32) & 0xFFFF);
+            self.opcode |= (self.arg(1) as u32) & 0x0F;
+        } else {
+            self.opcode |= (self.arg(0) as u32) & 0x0F;
+            self.argval = 0;
+        }
+    }
+
+    /// TMS9900. The second operand becomes the byte-swapped argument, the
+    /// first's low nibble goes into the opcode -- T2 with the roles exchanged.
+    fn t3(&mut self) {
+        self.argval = Self::swap16((self.arg(1) as u32) & 0xFFFF);
+        self.opcode |= (self.arg(0) as u32) & 0x0F;
+    }
+
+    /// TMS9900: two register operands, both folded into the opcode.
+    fn t4(&mut self) {
+        self.opcode |= ((self.arg(0) as u32) & 0x0F) | (((self.arg(1) as u32) & 0x0F) << 6);
+        self.argval = 0;
+    }
+
+    /// As TD, but the first operand is masked to a nibble rather than to
+    /// seven bits.
+    fn t6(&mut self) {
+        let dma = self.shift_and(0, 0, 0x0F);
+        let arg1 = if self.argv.len() > 1 {
+            self.shift_and(1, self.shift, self.or)
+        } else {
+            0
+        };
+        self.opcode |= dma | arg1;
+        self.argval = 0;
+    }
+
+    /// 3R without the relative third operand: three operands, one byte each,
+    /// low byte first.
+    fn a3(&mut self) {
+        self.argval = (((self.arg(0) as u32) & 0xFF)
+            | (((self.arg(1) as u32) & 0xFF) << 8)
+            | (((self.arg(2) as u32) & 0xFF) << 16)) as i32;
+    }
+
+    /// Z8: two operands combined into one byte, arg0 in the low nibble and
+    /// arg1 in the high. `swapped` selects C5, which exchanges them.
+    fn cn(&mut self, swapped: bool) {
+        let (lo, hi) = if swapped { (1usize, 0usize) } else { (0usize, 1usize) };
+        let v = ((self.arg(lo) as u32) & 0x0F) | (((self.arg(hi) as u32) & 0x0F) << 4);
+        self.argval = v as i32;
+        if self.or != 0 && v != (v & self.or) {
+            let detail = Some(format!(
+                "{} or {}",
+                self.argt.first().cloned().unwrap_or_default(),
+                self.argt.get(1).cloned().unwrap_or_default()
+            ));
+            self.diags.push(Diag { msg: "range of argument exceeded.", detail });
+        }
+    }
+
+    /// ST7: as MZ, but rewriting Cx -> Bx and Dx -> Ex.
+    fn sz(&mut self) {
+        if (self.argval as i64) < 0x10000 && self.aval() <= 0xFF {
+            self.opcode = match self.opcode & 0xF0 {
+                0xC0 => (self.opcode & 0x0F) | 0xB0,
+                0xD0 => (self.opcode & 0x0F) | 0xE0,
+                _ => self.opcode,
+            };
+            self.arg_bytes = 1;
+        } else {
+            self.argval = Self::swap16(self.aval());
+        }
+    }
+
+    /// ST7: as MB, but the bit number is the SECOND operand rather than the
+    /// first.
+    fn sb(&mut self) {
+        let bit = self.arg(1);
+        self.opcode |= ((bit as u32) & 0x7) << 1;
+        if self.argv.len() >= 3 {
+            let d = self.arg(2) - self.pcx - 3;
+            if !(-128..=127).contains(&d) {
+                self.argval = 0;
+                self.err("Range of relative branch exceeded.");
+            } else {
+                self.argval = (((d & 0xFF) << 8) | (self.arg(0) & 0xFF)) as i32;
+            }
+        } else {
+            self.argval = self.arg(0) & 0xFF;
+        }
+    }
+
+    /// uPD75000: a 4-bit PC-relative displacement OR-ed into the opcode.
+    fn r3(&mut self) {
+        let d = self.delta(self.aval() as i32);
+        if !(-16..=15).contains(&d) {
+            self.err("Range of relative branch exceeded.");
+            self.argval = 0;
+        } else {
+            self.opcode |= (d as u32) & 0x0F;
+            self.argval = 0;
+        }
+    }
+
+    /// Z8: if both operands are working registers (E0-EF) they combine into
+    /// one byte via the vector path and the encoding drops to working-register
+    /// mode; otherwise the pair is byte-swapped.
+    fn zw(&mut self) {
+        let (a, b) = ((self.arg(0) as u32) & 0xFF, (self.arg(1) as u32) & 0xFF);
+        if (0xE0..=0xEF).contains(&a) && (0xE0..=0xEF).contains(&b) {
+            self.vector = Some(vec![(((a & 0x0F) << 4) | (b & 0x0F)) as u8]);
+            self.opcode_bytes = self.opcode_bytes.saturating_sub(1);
+            self.arg_bytes = 1;
+        } else {
+            self.argval = ((b << 8) | a) as i32;
+        }
+    }
+
+    /// Z8 DJNZ: the first operand is a working register OR-ed into the
+    /// opcode's high nibble, the second a 1-byte PC-relative target.
+    fn zd(&mut self) {
+        self.opcode |= ((self.arg(0) as u32) & 0x0F) << 4;
+        let d = self.delta(self.arg(1));
+        if !(-128..=127).contains(&d) {
+            self.argval = 0;
+            self.err("Range of relative branch exceeded.");
+        } else {
+            self.argval = d & 0xFF;
+        }
+    }
+
+    /// Z8 `LD immed[r1],r2`: the second operand must be a working register
+    /// (below 16) and is OR-ed into the opcode's high nibble; the first gets
+    /// the default handling.
+    fn zl(&mut self) {
+        let r = self.arg(1);
+        if !(0..16).contains(&r) {
+            self.range(1);
+        }
+        self.opcode |= ((r as u32) & 0x0F) << 4;
+        self.argval = self.aval() as i32;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::table::{self, Table};
+
+    /// Every rule any shipped table can select must be implemented -- if one
+    /// is not, `apply` falls through to `Invalid MODOP.` and the corpus would
+    /// silently encode nothing for those rows.
+    #[test]
+    fn every_rule_the_shipped_tables_select_is_implemented() {
+        let implemented = [
+            table::NO, table::JM, table::JT, table::R1, table::ZP, table::MZ,
+            table::MB, table::ZB, table::ZI, table::CO, table::CR, table::CS,
+            table::SW, table::R3REL, table::T1, table::TD, table::TL,
+            table::T5, table::TA, table::SU, table::R2, table::I1, table::I2,
+            table::I3, table::I4, table::I5, table::I6, table::I7, table::I8,
+        ];
+        let mut seen = std::collections::BTreeSet::new();
+        for sel in ["05", "3210", "3225", "48", "51", "65", "68", "70", "80", "85", "96"] {
+            let t = Table::load(&format!("tables/tasm{}.tab", sel), sel).ok().unwrap();
+            for r in &t.rows {
+                assert!(
+                    implemented.contains(&r.rule),
+                    "tasm{}.tab selects an unimplemented rule via {:?}",
+                    sel,
+                    r.mnemonic
+                );
+                seen.insert(r.rule.0);
+            }
+        }
+        // README: 29 rules are reachable from a shipped table, and all are
+        // exercised by the vectors.
+        assert_eq!(seen.len(), 29, "expected 29 reachable rules");
     }
 }

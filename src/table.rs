@@ -53,6 +53,22 @@ pub const I6: Rule = Rule::key(b'I', b'6');
 pub const I7: Rule = Rule::key(b'I', b'7');
 pub const I8: Rule = Rule::key(b'I', b'8');
 
+// 7.25: implemented but selected by no shipped table, so nothing in the corpus
+// constrains them. Specified from behaviour alone; treat as unverified.
+pub const T2: Rule = Rule::key(b'T', b'2');
+pub const T3: Rule = Rule::key(b'T', b'3');
+pub const T4: Rule = Rule::key(b'T', b'4');
+pub const T6: Rule = Rule::key(b'T', b'6');
+pub const A3: Rule = Rule::key(b'3', b'A');
+pub const CN: Rule = Rule::key(b'C', b'N');
+pub const C5: Rule = Rule::key(b'C', b'5');
+pub const SZ: Rule = Rule::key(b'S', b'Z');
+pub const SB: Rule = Rule::key(b'S', b'B');
+pub const R3: Rule = Rule::key(b'R', b'3');
+pub const ZW: Rule = Rule::key(b'Z', b'W');
+pub const ZD: Rule = Rule::key(b'Z', b'D');
+pub const ZL: Rule = Rule::key(b'Z', b'L');
+
 #[derive(Clone, Debug)]
 pub struct Row {
     pub mnemonic: String,
