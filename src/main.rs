@@ -120,6 +120,18 @@ fn main() {
         }
     };
 
+    if o.debug {
+        eprintln!(
+            "[trace] tabasm {} ({} rows, {} regsets) selector={} wordaddrs={} msfirst={}",
+            env!("CARGO_PKG_VERSION"),
+            table.rows.len(),
+            table.regsets.len(),
+            table.selector,
+            table.wordaddrs,
+            table.msfirst
+        );
+    }
+
     let source = o.source().unwrap().to_string();
     let (base, base_warn) = o.base_name();
     if let Some(w) = base_warn {

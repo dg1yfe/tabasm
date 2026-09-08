@@ -33,6 +33,9 @@ pub struct Asm {
     pub errors: u32,
     pub stdout: String,
     pub lst: Vec<String>,
+    /// Parallel to `lst`. Bit 0: force a page break before this line
+    /// (`.EJECT`). Bit 1: paging is disabled here (`.NOPAGE`).
+    lst_mark: Vec<u8>,
 
     // 4.5: these two take effect in pass 1 only and are NOT reset between
     // passes, so on pass 2 a change is already in force from line 1.
@@ -47,6 +50,10 @@ pub struct Asm {
     cond: Vec<Cond>,
     listing_on: bool,
     codes: bool,
+    /// 4.10: `.PAGE` / `.NOPAGE` turn paging on and off from the source.
+    paging: bool,
+    /// 4.10: `.EJECT` forces a break before the next listed line.
+    eject: bool,
     pub title: String,
     pub sym_out: Option<String>,
     pub avsym: bool,
@@ -87,6 +94,7 @@ impl Asm {
             errors: 0,
             stdout: String::new(),
             lst: Vec::new(),
+            lst_mark: Vec::new(),
             local_char: b'_',
             comment_char: b';',
             module: "noname".to_string(),
@@ -97,6 +105,8 @@ impl Asm {
             cond: Vec::new(),
             listing_on: true,
             codes: true,
+            paging: true,
+            eject: false,
             title: String::new(),
             sym_out: None,
             avsym: false,
@@ -182,6 +192,19 @@ impl Asm {
         self.report(message, detail);
     }
 
+    fn push_lst(&mut self, line: String) {
+        let mut mark = 0u8;
+        if self.eject {
+            mark |= 1;
+            self.eject = false;
+        }
+        if !self.paging {
+            mark |= 2;
+        }
+        self.lst.push(line);
+        self.lst_mark.push(mark);
+    }
+
     fn report(&mut self, message: &str, detail: Option<String>) {
         let text = self.fmt.render(&self.file, self.line_no, message, detail.as_deref());
         self.stdout.push_str(&text);
@@ -198,7 +221,7 @@ impl Asm {
             if message.ends_with(' ') {
                 self.pending.push(text);
             } else {
-                self.lst.push(text);
+                self.push_lst(text);
             }
         }
         self.errors += 1;
@@ -225,6 +248,8 @@ impl Asm {
             self.ls_first = true;
             self.listing_on = true;
             self.codes = true;
+            self.paging = true;
+            self.eject = false;
             self.img.flush();
             self.assemble_file(source, 0)?;
             if !self.cond.is_empty() {
@@ -235,6 +260,19 @@ impl Asm {
             }
             self.stdout
                 .push_str(&format!("{}: pass {} complete.\n", self.prog, pass));
+            // 1.3: -z writes free-form tracing to standard error. Its content
+            // is explicitly not a stable interface, so this is our own.
+            if self.o.debug {
+                eprintln!(
+                    "[trace] pass {}: {} lines, pc={:04X}, {} symbols, {} macros, {} errors",
+                    pass,
+                    self.lines_read,
+                    self.pc & 0xFFFF,
+                    self.syms.list.len(),
+                    self.macs.list.len(),
+                    self.errors
+                );
+            }
         }
         self.img.flush();
         Ok(())
@@ -289,7 +327,7 @@ impl Asm {
 
         self.list_line(&shown);
         for d in std::mem::take(&mut self.pending) {
-            self.lst.push(d);
+            self.push_lst(d);
         }
         Ok(())
     }
@@ -303,18 +341,12 @@ impl Asm {
         let skipped = self.skipping();
         let bytes = std::mem::take(&mut self.emitted);
         if !self.codes {
-            self.lst.push(listing::line_nocodes(shown));
+            self.push_lst(listing::line_nocodes(shown));
             return;
         }
         let first = bytes.len().min(listing::BYTES_PER_LINE);
-        self.lst.push(listing::line(
-            self.line_no,
-            self.depth,
-            self.line_pc,
-            skipped,
-            &bytes[..first],
-            shown,
-        ));
+        let l = listing::line(self.line_no, self.depth, self.line_pc, skipped, &bytes[..first], shown);
+        self.push_lst(l);
         // 9.1: continuation lines repeat the line number, advance the address
         // and leave the source column empty.
         let mut off = first;
@@ -322,8 +354,8 @@ impl Asm {
         while off < bytes.len() {
             let n = (bytes.len() - off).min(listing::BYTES_PER_LINE);
             let pc = self.line_pc.wrapping_add((off as u32) / unit);
-            self.lst
-                .push(listing::continuation(self.line_no, self.depth, pc, &bytes[off..off + n]));
+            let c = listing::continuation(self.line_no, self.depth, pc, &bytes[off..off + n]);
+            self.push_lst(c);
             off += n;
         }
     }
@@ -1032,7 +1064,12 @@ impl Asm {
             "NOLIST" => self.listing_on = false,
             "CODES" => self.codes = true,
             "NOCODES" => self.codes = false,
-            "PAGE" | "NOPAGE" | "EJECT" => {}
+            // 4.10 / 9.4: paging control from the source. No shipped program
+            // uses any of the three, so nothing in the corpus or the reference
+            // comparison pins them; they are implemented from the prose.
+            "PAGE" => self.paging = true,
+            "NOPAGE" => self.paging = false,
+            "EJECT" => self.eject = true,
             "TITLE" => self.title = operand.trim().trim_matches('"').to_string(),
 
             // --- 4.11 miscellaneous -------------------------------------------------
@@ -1246,8 +1283,13 @@ impl Asm {
         }
         lines.push(count.trim_end_matches('\n').to_string());
 
+        let marks = {
+            let mut m = self.lst_mark.clone();
+            m.resize(lines.len(), 0);
+            m
+        };
         let body = match self.o.page_lines {
-            Some(n) if n > 4 => self.paginate(&lines, n as usize),
+            Some(n) if n > 4 => self.paginate(&lines, &marks, n as usize),
             _ => lines,
         };
         let mut out = String::new();
@@ -1348,19 +1390,30 @@ impl Asm {
     /// feed. Measured against the golden: -p20 over test51.asm produces 19
     /// form feeds at a stride of 19 lines, of which three are the heading, so
     /// a page carries `lines - 4` listing lines.
-    fn paginate(&self, lines: &[String], page: usize) -> Vec<String> {
+    fn paginate(&self, lines: &[String], marks: &[u8], page: usize) -> Vec<String> {
         let per = page - 4;
         let mut out = Vec::new();
-        for (i, chunk) in lines.chunks(per).enumerate() {
-            out.push(format!(
-                "\u{0C}{:<34}{:<33}page {}",
-                self.table.banner,
-                self.source_name,
-                i + 1
-            ));
-            out.push(format!("{:<34}", self.page_title()));
-            out.push(String::new());
-            out.extend(chunk.iter().cloned());
+        let (mut pageno, mut on_page) = (0usize, usize::MAX);
+        for (i, line) in lines.iter().enumerate() {
+            let mark = marks.get(i).copied().unwrap_or(0);
+            // .NOPAGE suppresses breaks for as long as it is in force; the
+            // lines still list, they just do not start pages.
+            if mark & 2 != 0 {
+                out.push(line.clone());
+                continue;
+            }
+            if on_page >= per || mark & 1 != 0 {
+                pageno += 1;
+                out.push(format!(
+                    "\u{0C}{:<34}{:<33}page {}",
+                    self.table.banner, self.source_name, pageno
+                ));
+                out.push(format!("{:<34}", self.page_title()));
+                out.push(String::new());
+                on_page = 0;
+            }
+            out.push(line.clone());
+            on_page += 1;
         }
         out
     }
