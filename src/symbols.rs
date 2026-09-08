@@ -91,10 +91,6 @@ impl Symbols {
         self.get(name).map(|s| s.value)
     }
 
-    pub fn contains(&self, name: &str) -> bool {
-        self.index.contains_key(&self.key(name))
-    }
-
     /// Define a symbol. Returns false if the name already exists, which the
     /// caller reports as `Duplicate label:` -- 4.5 says the second definition
     /// is discarded and the first wins.

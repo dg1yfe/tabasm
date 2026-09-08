@@ -7,6 +7,7 @@
 //! difference across 363 compared artefacts. Hence i32/u32 throughout, with
 //! wrapping arithmetic -- overflow here is defined behaviour, not an error.
 
+use crate::errlog::msg;
 use crate::limits::UNDEFINED;
 
 #[derive(Clone, Debug)]
@@ -113,7 +114,7 @@ impl<'a> Eval<'a> {
     /// a binary operator. 10.3 gives the wording; 1.4 bit 0x08 gates it.
     fn non_unary_at_start(&mut self) {
         if self.check_non_unary && self.peek().is_some() {
-            self.err("Non-unary operator at beginning of expression.", None);
+            self.err(msg::NON_UNARY, None);
         }
     }
 
@@ -328,7 +329,7 @@ impl<'a> Eval<'a> {
             // in the original; INT_MIN / -1 traps on most hardware.
             Op::Div => {
                 if b == 0 {
-                    self.err("Division by zero.", None);
+                    self.err(msg::DIVIDE_BY_ZERO, None);
                     0
                 } else {
                     a.wrapping_div(b)
@@ -336,7 +337,7 @@ impl<'a> Eval<'a> {
             }
             Op::Mod => {
                 if b == 0 {
-                    self.err("Modulo by zero.", None);
+                    self.err(msg::MODULO_BY_ZERO, None);
                     0
                 } else {
                     a.wrapping_rem(b)
@@ -344,7 +345,7 @@ impl<'a> Eval<'a> {
             }
             Op::Shl => {
                 if b < 0 {
-                    self.err("Negative shift count.", None);
+                    self.err(msg::NEGATIVE_SHIFT, None);
                     0
                 } else if b >= 32 {
                     0
@@ -354,7 +355,7 @@ impl<'a> Eval<'a> {
             }
             Op::Shr => {
                 if b < 0 {
-                    self.err("Negative shift count.", None);
+                    self.err(msg::NEGATIVE_SHIFT, None);
                     0
                 } else if b >= 32 {
                     a >> 31 // 0 for a non-negative value, -1 for a negative one
@@ -419,7 +420,7 @@ impl<'a> Eval<'a> {
                 if self.peek() == Some(b')') {
                     self.pos += 1;
                 } else {
-                    self.err("Paren imbalance.", None);
+                    self.err(msg::PAREN_IMBALANCE, None);
                 }
                 Some(v)
             }
@@ -474,7 +475,7 @@ impl<'a> Eval<'a> {
         }
         if self.pos == start {
             // No digits: `%` and `@` with nothing after them.
-            self.err("Invalid token where value expected:", None);
+            self.err(msg::INVALID_TOKEN, None);
         }
         v as i32
     }
@@ -534,7 +535,7 @@ impl<'a> Eval<'a> {
                 c as i32
             }
             None => {
-                self.err("Premature end of CHAR token", None);
+                self.err(msg::PREMATURE_CHAR, None);
                 return 0;
             }
         };
@@ -676,9 +677,9 @@ mod tests {
     fn division_and_shift_hazards_are_guarded() {
         let o = eval("1/0", 0, false, b'_', &mut |_| None);
         assert_eq!(o.value, 0);
-        assert_eq!(o.diags[0].msg, "Division by zero.");
+        assert_eq!(o.diags[0].msg, msg::DIVIDE_BY_ZERO);
         let o = eval("1%0", 0, false, b'_', &mut |_| None);
-        assert_eq!(o.diags[0].msg, "Modulo by zero.");
+        assert_eq!(o.diags[0].msg, msg::MODULO_BY_ZERO);
         // INT_MIN / -1 is the other trap the original did not guard.
         assert_eq!(v("(1<<31)/-1"), i32::MIN);
         assert_eq!(v("(1<<31)%-1"), 0);
@@ -687,7 +688,7 @@ mod tests {
         assert_eq!(v("1>>64"), 0);
         assert_eq!(v("-1>>64"), -1);
         let o = eval("1<<-1", 0, false, b'_', &mut |_| None);
-        assert_eq!(o.diags[0].msg, "Negative shift count.");
+        assert_eq!(o.diags[0].msg, msg::NEGATIVE_SHIFT);
     }
 
     #[test]

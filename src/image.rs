@@ -85,8 +85,4 @@ impl Image {
             bytes: self.mem[lo as usize..=hi as usize].to_vec(),
         })
     }
-
-    pub fn slice(&self, lo: u32, hi: u32) -> &[u8] {
-        &self.mem[lo as usize..=(hi as usize).min(IMAGE_SIZE - 1)]
-    }
 }

@@ -3,7 +3,7 @@
 //! Built from the specification alone. See AGENTS.md: no part of this descends from the
 //! original implementation's source or binaries.
 
-#![allow(dead_code)] // constants and helpers land ahead of their first use
+#![allow(dead_code)] // exit codes and the message catalogue are kept complete; see the findings log
 
 mod asm;
 mod cli;

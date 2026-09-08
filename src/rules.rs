@@ -5,6 +5,7 @@
 //! declared .NOARGSHIFT, the default step `argval = (argval << SHIFT) | OR`
 //! runs; then bytes are emitted.
 
+use crate::errlog::msg;
 use crate::expr::Diag;
 use crate::table::{self, Rule};
 
@@ -48,7 +49,7 @@ impl Enc {
     /// operand's source text as detail.
     fn range(&mut self, i: usize) {
         let detail = self.argt.get(i).cloned();
-        self.diags.push(Diag { msg: "Range of argument exceeded.", detail });
+        self.diags.push(Diag { msg: msg::RANGE_ARG, detail });
     }
 
     fn checked(&mut self, i: usize, lo: i32, hi: i32) -> i32 {
@@ -116,7 +117,7 @@ impl Enc {
             table::ZL => self.zl(),
             // Phase B and the unexercised 7.25 rules are not implemented yet.
             // 10.3: this is exactly what `Invalid MODOP.` is for.
-            _ => self.err("Invalid MODOP."),
+            _ => self.err(msg::INVALID_MODOP),
         }
         // 5.5: the default shift/OR step, unless the table opted out.
         if !noargshift {
@@ -131,7 +132,7 @@ impl Enc {
         // high bits must agree, so tasm48.tab's 0000 disables the check
         // entirely (the 8048 takes high address bits from SEL MB instead).
         if ((self.pcx as u32).wrapping_add(2) & self.or) != (aval & self.or) {
-            self.err("Branch off of current 2K page.");
+            self.err(msg::OFF_2K_PAGE);
         }
         self.opcode |= (aval & 0x700) >> 3;
         self.argval = (aval & 0xFF) as i32;
@@ -143,7 +144,7 @@ impl Enc {
         // pcx + 1, not pcx: an instruction starting at XXFF has its operand
         // byte on the following page, and the target must be on that page.
         if (aval & 0xFF00) != ((self.pcx as u32).wrapping_add(1) & 0xFF00) {
-            self.err("Branch off of current page.");
+            self.err(msg::OFF_PAGE);
         }
         self.argval = (aval & 0xFF) as i32;
     }
@@ -153,7 +154,7 @@ impl Enc {
         let d = self.delta(self.aval() as i32);
         if !(-128..=127).contains(&d) {
             self.argval = 0;
-            self.err("Range of relative branch exceeded.");
+            self.err(msg::RANGE_BRANCH);
         } else {
             self.argval = d & 0xFF;
         }
@@ -199,7 +200,7 @@ impl Enc {
             let d = self.arg(2) - self.pcx - 3;
             if !(-128..=127).contains(&d) {
                 self.argval = 0;
-                self.err("Range of relative branch exceeded.");
+                self.err(msg::RANGE_BRANCH);
             } else {
                 // The displacement occupies the HIGH byte, so the zero-page
                 // address is written first by the low-byte-first emitter.
@@ -266,7 +267,7 @@ impl Enc {
                 self.argt.first().cloned().unwrap_or_default(),
                 self.argt.get(1).cloned().unwrap_or_default()
             ));
-            self.diags.push(Diag { msg: "range of argument exceeded.", detail });
+            self.diags.push(Diag { msg: msg::RANGE_ARG_LC, detail });
         }
     }
 
@@ -275,7 +276,7 @@ impl Enc {
         let d = self.delta(self.arg(1));
         if !(-128..=127).contains(&d) {
             self.argval = 0;
-            self.err("Range of relative branch exceeded.");
+            self.err(msg::RANGE_BRANCH);
         } else {
             self.argval = ((self.argval as u32 & 0xFF) | (((d as u32) & 0xFF) << 8)) as i32;
         }
@@ -295,7 +296,7 @@ impl Enc {
             self.argval = 0;
             // Lower-case 'r' here, upper-case in R1/MB/CR. Inconsistent in the
             // original; the reference output preserves it.
-            self.err("range of relative branch exceeded.");
+            self.err(msg::RANGE_BRANCH_LC);
         } else {
             self.argval = ((self.aval() & 0xFF)
                 | (((self.arg(1) as u32) & 0xFF) << 8)
@@ -344,7 +345,7 @@ impl Enc {
         let result = if selector == "3225" { value & 7 } else { value & 1 };
         if result != value {
             let detail = self.argt.get(i).cloned();
-            self.diags.push(Diag { msg: "Range of ARP argument exceeded.", detail });
+            self.diags.push(Diag { msg: msg::RANGE_ARP, detail });
         }
         result
     }
@@ -363,8 +364,8 @@ impl Enc {
         if v != (v & valid) {
             let detail = self.argt.get(i).cloned();
             // Note the lower case, distinct from the shared single-operand
-            // check's "Range of argument exceeded.".
-            self.diags.push(Diag { msg: "range of argument exceeded.", detail });
+            // check's msg::RANGE_ARG.
+            self.diags.push(Diag { msg: msg::RANGE_ARG_LC, detail });
         }
     }
 
@@ -529,10 +530,10 @@ impl Enc {
         let bit = self.arg(1);
         if !(-128..=127).contains(&d) {
             self.argval = 0;
-            self.err("range of relative branch exceeded.");
+            self.err(msg::RANGE_BRANCH_LC);
         } else if bit > 7 {
             self.argval = 0;
-            self.err("range of argument exceeded.");
+            self.err(msg::RANGE_ARG_LC);
         } else {
             self.argval = (((self.arg(0) as u32) & 0xFF) | (((d as u32) & 0xFF) << 8)) as i32;
             self.opcode |= bit as u32;
@@ -545,7 +546,7 @@ impl Enc {
         let d = self.delta(self.arg(0));
         if !(-1024..=1023).contains(&d) {
             let detail = Some(format!("offset={}", d));
-            self.diags.push(Diag { msg: "range of relative branch exceeded.", detail });
+            self.diags.push(Diag { msg: msg::RANGE_BRANCH_LC, detail });
         } else {
             self.opcode |= (d as u32) & 0x07FF;
         }
@@ -678,7 +679,7 @@ impl Enc {
                 self.argt.first().cloned().unwrap_or_default(),
                 self.argt.get(1).cloned().unwrap_or_default()
             ));
-            self.diags.push(Diag { msg: "range of argument exceeded.", detail });
+            self.diags.push(Diag { msg: msg::RANGE_ARG_LC, detail });
         }
     }
 
@@ -705,7 +706,7 @@ impl Enc {
             let d = self.arg(2) - self.pcx - 3;
             if !(-128..=127).contains(&d) {
                 self.argval = 0;
-                self.err("Range of relative branch exceeded.");
+                self.err(msg::RANGE_BRANCH);
             } else {
                 self.argval = (((d & 0xFF) << 8) | (self.arg(0) & 0xFF)) as i32;
             }
@@ -718,7 +719,7 @@ impl Enc {
     fn r3(&mut self) {
         let d = self.delta(self.aval() as i32);
         if !(-16..=15).contains(&d) {
-            self.err("Range of relative branch exceeded.");
+            self.err(msg::RANGE_BRANCH);
             self.argval = 0;
         } else {
             self.opcode |= (d as u32) & 0x0F;
@@ -751,7 +752,7 @@ impl Enc {
         let d = self.delta(self.arg(1));
         if !(-128..=127).contains(&d) {
             self.argval = 0;
-            self.err("Range of relative branch exceeded.");
+            self.err(msg::RANGE_BRANCH);
         } else {
             self.argval = d & 0xFF;
         }

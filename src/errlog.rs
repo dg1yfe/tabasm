@@ -9,6 +9,7 @@
 /// the text: three of these are padded to 34 columns and the rest are not,
 /// and several exist in both an upper- and a lower-case form because the
 /// original raised them from different sites.
+#[allow(dead_code)] // three alternate-site messages; see the findings log
 pub mod msg {
     // Symbols
     pub const LABEL_NOT_FOUND: &str = "Label not found:";
@@ -30,6 +31,7 @@ pub mod msg {
     pub const DIVIDE_BY_ZERO: &str = "Division by zero.";
     pub const MODULO_BY_ZERO: &str = "Modulo by zero.";
     pub const NEGATIVE_SHIFT: &str = "Negative shift count.";
+    pub const PREMATURE_CHAR: &str = "Premature end of CHAR token";
 
     // Instructions and operands
     pub const BAD_DIRECTIVE: &str = "unrecognized directive.           ";

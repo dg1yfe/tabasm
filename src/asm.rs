@@ -69,6 +69,8 @@ pub struct Asm {
     /// Bytes emitted by the current statement, for the listing.
     emitted: Vec<u8>,
     line_pc: u32,
+    /// 10.1: `label table overflow` is reported once per run, not per label.
+    reported_label_overflow: bool,
     /// Diagnostics that belong AFTER their listing line rather than before it.
     pending: Vec<String>,
     /// Names defined so far in THIS pass. A duplicate has to be detected per
@@ -117,6 +119,7 @@ impl Asm {
             lines_read: 0,
             emitted: Vec::new(),
             line_pc: 0,
+            reported_label_overflow: false,
             pending: Vec::new(),
             seen_this_pass: std::collections::HashSet::new(),
             o,
@@ -432,6 +435,7 @@ impl Asm {
         }
         if self.pass == 1 {
             self.syms.define(&qualified, value, self.segment, local);
+            self.check_label_overflow();
         } else {
             // 2.1: the phase error is raised when the label is reached in pass
             // 2 and its recorded value disagrees with the counter. The label
@@ -469,6 +473,28 @@ impl Asm {
                 && matches!(t.as_bytes()[0], b'%' | b'*' | b'/' | b'<' | b'>' | b'=' | b'&' | b'!')
             {
                 self.diag(msg::NON_UNARY, Some(t.to_string()));
+            }
+        }
+    }
+
+    /// 10.1: at most 128 arguments per instruction or directive. Over that,
+    /// the surplus is dropped and the run continues.
+    fn split_args_checked(&mut self, operand: &str) -> Vec<String> {
+        let mut v = split_args(operand);
+        if v.len() > MAX_ARGS {
+            self.diag(msg::TOO_MANY_ARGS, None);
+            v.truncate(MAX_ARGS);
+        }
+        v
+    }
+
+    /// 10.1: the symbol table filling up is NOT fatal -- the label is dropped,
+    /// this is logged once, and the run continues to exit 1.
+    fn check_label_overflow(&mut self) {
+        if self.syms.overflowed && !self.reported_label_overflow {
+            self.reported_label_overflow = true;
+            if self.pass == 1 {
+                self.report(msg::LABEL_TABLE_OVERFLOW, None);
             }
         }
     }
@@ -864,7 +890,7 @@ impl Asm {
             // --- 4.3 data emission ------------------------------------------
             "BYTE" | "DB" => {
                 let mut bytes = Vec::new();
-                for a in split_args(operand) {
+                for a in self.split_args_checked(operand) {
                     let t = a.trim();
                     if t.starts_with('"') {
                         // One byte per character; whitespace inside is kept.
@@ -881,7 +907,7 @@ impl Asm {
             }
             "WORD" | "DW" => {
                 let mut bytes = Vec::new();
-                for a in split_args(operand) {
+                for a in self.split_args_checked(operand) {
                     let v = self.eval(a.trim()) as u32;
                     // 4.11: byte order follows the SOURCE .LSFIRST/.MSFIRST,
                     // which is a different setting from the table directive of
@@ -904,7 +930,7 @@ impl Asm {
                 self.emit_and_advance(&bytes);
             }
             "FILL" => {
-                let args = split_args(operand);
+                let args = self.split_args_checked(operand);
                 // 4.3: the count is evaluated on both passes during parsing,
                 // so it must not depend on a forward reference. It is taken as
                 // a 16-bit value, so a negative count wraps -- .fill -1 fills
@@ -970,6 +996,7 @@ impl Asm {
                         }
                     } else if self.pass == 1 {
                         self.syms.define(&q, v, self.segment, local);
+                        self.check_label_overflow();
                     } else {
                         self.syms.redefine(&q, v);
                     }
@@ -989,7 +1016,7 @@ impl Asm {
             }
             "EXPORT" => {
                 if self.pass == 2 {
-                    for a in split_args(operand) {
+                    for a in self.split_args_checked(operand) {
                         let (q, _) = Symbols::qualify(a.trim(), self.local_char, &self.module);
                         self.syms.export(&q);
                     }

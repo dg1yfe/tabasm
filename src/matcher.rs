@@ -1,5 +1,6 @@
 //! Matching a source line against the instruction table.
 
+use crate::limits::MAX_ARGS;
 use crate::table::{Row, Table};
 
 pub struct Matched {
@@ -100,6 +101,11 @@ fn walk(
                     orig.len() - tail.len()
                 }
             };
+            // 6.4: a pattern with more than 128 wildcards (MAXARGS) is
+            // rejected -- the row cannot capture that many operands.
+            if args.len() >= MAX_ARGS {
+                return None;
+            }
             args.push(String::from_utf8_lossy(&orig[o..end]).into_owned());
             o = end;
             p += 1;
