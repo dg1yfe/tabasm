@@ -57,6 +57,8 @@ pub struct Asm {
     /// Bytes emitted by the current statement, for the listing.
     emitted: Vec<u8>,
     line_pc: u32,
+    /// Diagnostics that belong AFTER their listing line rather than before it.
+    pending: Vec<String>,
 }
 
 impl Asm {
@@ -93,6 +95,7 @@ impl Asm {
             depth: 0,
             emitted: Vec::new(),
             line_pc: 0,
+            pending: Vec::new(),
             o,
         }
     }
@@ -151,12 +154,21 @@ impl Asm {
         let text = self.fmt.render(&self.file, self.line_no, message, detail.as_deref());
         self.stdout.push_str(&text);
         self.stdout.push('\n');
-        // The listing carries them too, and the goldens put them BEFORE the
-        // line they refer to -- 9.5's prose says after, the corpus says
-        // before, and the corpus wins.
         if self.listing_on && !self.o.quiet {
-            self.lst.push_str(&text);
-            self.lst.push('\n');
+            // Where a diagnostic sits relative to its own listing line is not
+            // uniform, and 9.5's "immediately after the line they refer to" is
+            // wrong for most of them. Across every golden, the three that
+            // follow their line are exactly the three whose message text is
+            // padded with trailing spaces -- unrecognized instruction.,
+            // unrecognized directive., label value misalligned. -- while every
+            // unpadded message precedes it. Two call sites in the original,
+            // one of which padded and reported late.
+            if message.ends_with(' ') {
+                self.pending.push(text);
+            } else {
+                self.lst.push_str(&text);
+                self.lst.push('\n');
+            }
         }
         self.errors += 1;
     }
@@ -241,6 +253,10 @@ impl Asm {
         }
 
         self.list_line(&shown);
+        for d in std::mem::take(&mut self.pending) {
+            self.lst.push_str(&d);
+            self.lst.push('\n');
+        }
         Ok(())
     }
 
@@ -621,9 +637,9 @@ fn split_args(s: &str) -> Vec<String> {
             },
         }
     }
-    if !cur.is_empty() || !out.is_empty() {
-        out.push(cur);
-    }
+    // Always at least one element, possibly empty: a bare `.byte` with no
+    // operand emits a single zero byte (golden err-baddir.lst line 5).
+    out.push(cur);
     out
 }
 
@@ -819,6 +835,12 @@ impl Asm {
                     self.img.flush();
                 }
                 self.pc = v;
+                // The listing shows the address AFTER an .ORG -- golden 85.lst
+                // line 18 lists `.org 1000h` at 1000, not at the previous
+                // counter. .BLOCK, which also moves the counter, lists the
+                // address BEFORE (96.lst line 15), so this is specific to the
+                // directives that assign outright.
+                self.line_pc = v;
             }
 
             // --- 4.5 symbols ---------------------------------------------------

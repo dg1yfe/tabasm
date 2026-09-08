@@ -204,7 +204,11 @@ impl Options {
             'q' => self.quiet = true,
             's' => self.symfile = true,
             't' => self.table = Some(rest.to_string()),
-            'x' => self.class_mask = if rest.is_empty() { 1 } else { hex(rest) },
+            // 1.3 calls 1 the default, which is the mask when -x is ABSENT.
+            // A bare -x enables every extended class: the corpus assembles
+            // tasm48 with `-48 -x` and its golden emits class-2, class-4 and
+            // class-8 rows, which a mask of 1 would exclude.
+            'x' => self.class_mask = if rest.is_empty() { 0xFF } else { hex(rest) },
             'y' => self.timing = true,
             'z' => self.debug = true,
             _ => warnings.push(format!("unrecognized option: -{}", body)),

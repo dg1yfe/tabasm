@@ -169,13 +169,39 @@ impl<'a> Eval<'a> {
     /// No precedence at all: a running value, an operator, exactly one
     /// following value, applied immediately. `1+2*3+4` is `((1+2)*3)+4` = 13.
     /// A leading `-` works only because the accumulator starts at zero.
+    ///
+    /// The first token is read in VALUE position, which is what makes `%1010`
+    /// a binary constant rather than a modulo against the empty accumulator
+    /// (3.4). Only if no value can be read there does the leading `+` or `-`
+    /// fall through to operator handling.
     fn accumulator(&mut self) -> i32 {
+        self.accumulate(false)
+    }
+
+    /// A parenthesised sub-expression is its own accumulator run, which is why
+    /// `1+2*(3+4)` is 21 in compatibility mode.
+    fn accumulator_paren(&mut self) -> i32 {
+        self.accumulate(true)
+    }
+
+    fn accumulate(&mut self, in_paren: bool) -> i32 {
         let mut acc: i32 = 0;
         let mut first = true;
         loop {
             self.skip_ws();
-            if self.peek().is_none() {
-                break;
+            match self.peek() {
+                None => break,
+                Some(b')') if in_paren => break,
+                _ => {}
+            }
+            if first {
+                first = false;
+                let save = self.pos;
+                if let Some(v) = self.value() {
+                    acc = v;
+                    continue;
+                }
+                self.pos = save;
             }
             let save = self.pos;
             if let Some((op, len)) = self.peek_binop() {
@@ -187,34 +213,31 @@ impl<'a> Eval<'a> {
                         break;
                     }
                 }
-                first = false;
                 continue;
             }
             // 3.6: `~` and `!` in operator position REPLACE the accumulator,
             // so `5 ~ 3` yields ~3 rather than 5.
             match self.peek() {
                 Some(b'~') | Some(b'!') => {
-                    let unary = self.peek() == Some(b'~');
+                    let complement = self.peek() == Some(b'~');
                     self.pos += 1;
                     match self.value() {
                         Some(v) => {
-                            acc = if unary { !(v as u32) as i32 } else { (v == 0) as i32 }
+                            acc = if complement {
+                                !(v as u32) as i32
+                            } else {
+                                (v == 0) as i32
+                            }
                         }
                         None => break,
                     }
-                    first = false;
-                    continue;
                 }
-                _ => {}
-            }
-            // A value. On the first pass this is the implicit `0 + value`;
-            // later it REPLACES the accumulator (3.6).
-            match self.value() {
-                Some(v) => {
-                    acc = if first { v } else { v };
-                    first = false;
-                }
-                None => break,
+                // 3.6: a value where an operator was expected replaces the
+                // accumulator.
+                _ => match self.value() {
+                    Some(v) => acc = v,
+                    None => break,
+                },
             }
         }
         acc
@@ -408,42 +431,6 @@ impl<'a> Eval<'a> {
             }
             _ => None,
         }
-    }
-
-    /// A parenthesised sub-expression still evaluates as one accumulator run,
-    /// which is why `1+2*(3+4)` is 21 in compatibility mode and not 21-free.
-    fn accumulator_paren(&mut self) -> i32 {
-        let mut acc: i32 = 0;
-        let mut first = true;
-        loop {
-            self.skip_ws();
-            match self.peek() {
-                None | Some(b')') => break,
-                _ => {}
-            }
-            let save = self.pos;
-            if let Some((op, len)) = self.peek_binop() {
-                self.pos += len;
-                match self.value() {
-                    Some(rhs) => acc = self.apply(op, acc, rhs),
-                    None => {
-                        self.pos = save;
-                        break;
-                    }
-                }
-                first = false;
-                continue;
-            }
-            match self.value() {
-                Some(v) => {
-                    acc = v;
-                    let _ = first;
-                    first = false;
-                }
-                None => break,
-            }
-        }
-        acc
     }
 
     fn radix(&mut self, base: u32) -> i32 {
