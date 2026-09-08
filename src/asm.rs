@@ -1106,17 +1106,54 @@ impl Asm {
 
 impl Asm {
     /// The order symbols appear in the symbol file, the export file and the
-    /// -l/-ll label tables: a STABLE sort keyed on the first character only,
-    /// as 2.1 states.
+    /// -l/-ll label tables (2.1).
     ///
-    /// Verified against the 2001 binary on nine of the eleven reference
-    /// programs. Two -- 6805 and 6800 -- come out with one adjacent pair
-    /// transposed against this rule, which no comparison sort can produce; see
-    /// the findings log. Every golden vector agrees with the rule as written.
+    /// This is a COCKTAIL (bidirectional bubble) SORT keyed on the first
+    /// character, whose bookkeeping terminates early -- so for some inputs the
+    /// result is not fully sorted, and the residual disorder is deterministic
+    /// and observable. It must be reproduced as the procedure, not by a
+    /// correct sort: `k` records the last swap and is carried across BOTH
+    /// sweeps, the boundaries collapse around it, and the loop stops the
+    /// moment `top >= bot` rather than when a sweep makes no swap.
+    ///
+    /// One pass usually leaves the table ordered, which is why every golden
+    /// vector and nine of the eleven reference programs look sorted; 6805 and
+    /// 6800 are where it shows.
     pub fn sorted_symbols(&self) -> Vec<&crate::symbols::Symbol> {
-        let mut v: Vec<&crate::symbols::Symbol> = self.syms.list.iter().collect();
-        v.sort_by_key(|s| s.name.as_bytes().first().copied().unwrap_or(0));
-        v
+        fn key(s: &crate::symbols::Symbol) -> u8 {
+            s.name.as_bytes().first().copied().unwrap_or(0)
+        }
+        let mut l: Vec<&crate::symbols::Symbol> = self.syms.list.iter().collect();
+        let n = l.len() as isize;
+        if n < 2 {
+            return l;
+        }
+        let (mut top, mut bot) = (0isize, n - 2);
+        let mut k = bot;
+        loop {
+            let mut i = bot;
+            while i >= top {
+                if key(l[i as usize]) > key(l[i as usize + 1]) {
+                    l.swap(i as usize, i as usize + 1);
+                    k = i;
+                }
+                i -= 1;
+            }
+            top = k + 1;
+            let mut i = top;
+            while i <= bot {
+                if key(l[i as usize]) > key(l[i as usize + 1]) {
+                    l.swap(i as usize, i as usize + 1);
+                    k = i;
+                }
+                i += 1;
+            }
+            bot = k - 1;
+            if top >= bot {
+                break;
+            }
+        }
+        l
     }
 
     fn symbol_file(&self) -> String {
@@ -1251,7 +1288,16 @@ impl Asm {
             // not a nine-column padded field: a 32-bit value prints eight
             // digits and pushes the rest of the row right rather than being
             // squeezed. Only visible when a value exceeds four digits.
-            out.push(format!("{:04X}     {:<7}{:<32}", s.value, s.segment.letter(), s.name));
+            // The type column is three flags -- segment, Local, Export --
+            // followed by four spaces, which is why a plain segment letter
+            // reads as one letter and six spaces.
+            let flags = format!(
+                "{}{}{}",
+                s.segment.letter(),
+                if s.local { 'L' } else { ' ' },
+                if s.exported { 'E' } else { ' ' }
+            );
+            out.push(format!("{:04X}     {}    {:<32}", s.value, flags, s.name));
         }
         out.push(String::new());
     }
@@ -1319,5 +1365,60 @@ impl Asm {
         } else {
             "tabasm".to_string()
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    /// 2.1's worked example: labels defined `bee dee ayy azz ell` (first
+    /// characters b d a a l) come out `ayy bee azz dee ell` -- a b a d l, NOT
+    /// the fully sorted a a b d l. The early stop leaves `bee` ahead of `azz`.
+    #[test]
+    fn the_cocktail_sort_stops_early_as_specified() {
+        fn order(names: &[&str]) -> Vec<String> {
+            let mut l: Vec<&str> = names.to_vec();
+            let n = l.len() as isize;
+            if n < 2 {
+                return l.iter().map(|s| s.to_string()).collect();
+            }
+            let key = |s: &str| s.as_bytes()[0];
+            let (mut top, mut bot) = (0isize, n - 2);
+            let mut k = bot;
+            loop {
+                let mut i = bot;
+                while i >= top {
+                    if key(l[i as usize]) > key(l[i as usize + 1]) {
+                        l.swap(i as usize, i as usize + 1);
+                        k = i;
+                    }
+                    i -= 1;
+                }
+                top = k + 1;
+                let mut i = top;
+                while i <= bot {
+                    if key(l[i as usize]) > key(l[i as usize + 1]) {
+                        l.swap(i as usize, i as usize + 1);
+                        k = i;
+                    }
+                    i += 1;
+                }
+                bot = k - 1;
+                if top >= bot {
+                    break;
+                }
+            }
+            l.iter().map(|s| s.to_string()).collect()
+        }
+        assert_eq!(order(&["bee", "dee", "ayy", "azz", "ell"]), ["ayy", "bee", "azz", "dee", "ell"]);
+        // 6805: bit3 data addz addr loop1 -> addz bit3 addr data loop1
+        assert_eq!(
+            order(&["bit3", "data", "addz", "addr", "loop1"]),
+            ["addz", "bit3", "addr", "data", "loop1"]
+        );
+        // 8051 comes out fully ordered, which is why the corpus never showed it.
+        assert_eq!(
+            order(&["labimm", "lab2", "lab3", "lab5", "labbt_1", "bit", "lab4", "jlab", "jlab5"]),
+            ["bit", "jlab", "jlab5", "labimm", "lab2", "lab3", "lab5", "labbt_1", "lab4"]
+        );
     }
 }
