@@ -4,10 +4,14 @@ use crate::limits::*;
 
 /// 4.7 caps the NUMBER OF PASSES as well as the length of one expansion, and
 /// says both are needed: a cyclic macro re-substitutes at unchanged length and
-/// so never trips the length cap. The exact cap is not specified; this is
-/// generous for any acyclic chain, which shortens by one nesting level per
-/// pass.
-const MAX_PASSES: usize = 32;
+/// so never trips the length cap.
+///
+/// The cap must SCALE WITH THE MACRO COUNT, because a legitimate acyclic chain
+/// can be as deep as there are macros -- a fixed cap would wrongly reject
+/// deep-but-finite nesting.
+fn max_passes(n_macros: usize) -> usize {
+    n_macros + LINE_SIZE
+}
 
 #[derive(Clone, Debug)]
 pub struct Macro {
@@ -114,8 +118,9 @@ impl Macros {
         }
 
         let mut cur = line.to_string();
-        for pass in 0..=MAX_PASSES {
-            if pass == MAX_PASSES {
+        let cap = max_passes(self.list.len());
+        for pass in 0..=cap {
+            if pass == cap {
                 errs.push(crate::errlog::msg::MACRO_TOO_DEEP);
                 break;
             }
@@ -252,12 +257,10 @@ fn split_top(s: &str) -> Vec<String> {
 
 /// Substitute a macro's parameters into its body.
 ///
-/// The spec does not state how a body references its parameters -- it gives
-/// the limits (10 parameters, 16 characters each) and the diagnostic for a
-/// reference with no argument, but not the syntax. No shipped example uses a
-/// parameterised macro, so nothing in the corpus pins this. Two forms are
-/// accepted here: the parameter's own name, and `?n` for the nth argument.
-/// Recorded in the findings log.
+/// 4.7: a parameter is referenced either by its NAME or by the token `?n`,
+/// where n is its ZERO-based position. Name substitution is by whole
+/// identifier -- the same rule as macro-name expansion -- so a parameter named
+/// `A` is left untouched inside `0Ah` or a longer name.
 fn substitute(m: &Macro, args: &[String]) -> (String, Vec<&'static str>) {
     let mut errs = Vec::new();
     let mut out = String::new();
@@ -268,8 +271,9 @@ fn substitute(m: &Macro, args: &[String]) -> (String, Vec<&'static str>) {
         if c == b'?' {
             let d = b.get(i + 1).copied().unwrap_or(0);
             if d.is_ascii_digit() {
+                // 4.7: `?n` is ZERO-based -- ?0 is the first parameter.
                 let n = (d - b'0') as usize;
-                match n.checked_sub(1).and_then(|k| args.get(k)) {
+                match args.get(n) {
                     Some(a) => out.push_str(a),
                     None => errs.push(crate::errlog::msg::MACRO_EXPECTS_ARGS),
                 }
@@ -281,6 +285,14 @@ fn substitute(m: &Macro, args: &[String]) -> (String, Vec<&'static str>) {
             continue;
         }
         if c.is_ascii_alphabetic() || c == b'_' {
+            // Whole identifiers only, by the same boundary rule macro-name
+            // expansion uses: a parameter named `A` must be left untouched
+            // inside `0Ah` -- and inside `0A`.
+            if start_of_ident_blocked(b, i) {
+                out.push(c as char);
+                i += 1;
+                continue;
+            }
             let start = i;
             while i < b.len() && (b[i].is_ascii_alphanumeric() || b[i] == b'_') {
                 i += 1;

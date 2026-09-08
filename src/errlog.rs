@@ -43,6 +43,8 @@ pub mod msg {
     pub const OFF_PAGE: &str = "Branch off of current page.";
     pub const UNUSED_MS_BYTE: &str = "Unused data in MS byte of argument.";
     pub const INVALID_MODOP: &str = "Invalid MODOP.";
+    /// Two spaces after the first '.', per 10.3 and 1.4.
+    pub const NO_INDIRECTION: &str = "Invalid operand.  No indirection for this instruction.";
     pub const RANGE_ARP: &str = "Range of ARP argument exceeded.";
     pub const OUTSIDE_IMAGE: &str = "Address outside memory image.";
     pub const SHORT_BYTE_COUNT: &str = "Table entry byte count is less than the opcode size.";
@@ -77,9 +79,17 @@ pub struct Format {
     spec: Option<String>,
 }
 
-/// A field width large enough to be a denial of service rather than a layout.
-/// `%99999999s` is one of the hostile inputs in the robustness suite.
-const MAX_WIDTH: usize = 512;
+/// 9.5: a huge width is ACCEPTED, not rejected -- it is a conforming
+/// conversion. The message is built with a bounded write into the line buffer,
+/// so an enormous width is padded and then truncated at the buffer rather than
+/// overflowing it.
+///
+/// The cut-off is measured from the `errfmt-bigwidth` vector, whose rendered
+/// line is exactly 510 characters -- two short of LINE_SIZE, the room the
+/// original's buffer leaves for the newline and terminator.
+const RENDER_LIMIT: usize = LINE_SIZE - 2;
+
+use crate::limits::LINE_SIZE;
 
 #[derive(PartialEq, Eq, Clone, Copy)]
 enum Conv {
@@ -148,21 +158,14 @@ fn parse(spec: &str) -> Option<Vec<Conv>> {
         if i < b.len() && b[i] == b'*' {
             return None;
         }
-        let ws = i;
+        // A width of any size is conforming; it is bounded at render time.
         while i < b.len() && b[i].is_ascii_digit() {
             i += 1;
         }
-        if spec[ws..i].len() > 6 {
-            return None;
-        }
         if i < b.len() && b[i] == b'.' {
             i += 1;
-            let ps = i;
             while i < b.len() && b[i].is_ascii_digit() {
                 i += 1;
-            }
-            if spec[ps..i].len() > 6 {
-                return None;
             }
         }
         match b.get(i) {
@@ -210,8 +213,8 @@ fn apply(spec: &str, file: &str, line: u32, message: &str, detail: &str) -> Stri
         while i < b.len() && b[i].is_ascii_digit() {
             i += 1;
         }
-        let width: usize = spec[ws..i].parse().unwrap_or(0);
-        let width = width.min(MAX_WIDTH);
+        // An absent width is zero, not unbounded.
+        let width: usize = if i > ws { spec[ws..i].parse().unwrap_or(RENDER_LIMIT) } else { 0 };
         let mut prec: Option<usize> = None;
         if i < b.len() && b[i] == b'.' {
             i += 1;
@@ -219,7 +222,7 @@ fn apply(spec: &str, file: &str, line: u32, message: &str, detail: &str) -> Stri
             while i < b.len() && b[i].is_ascii_digit() {
                 i += 1;
             }
-            prec = Some(spec[ps..i].parse::<usize>().unwrap_or(0).min(MAX_WIDTH));
+            prec = Some(spec[ps..i].parse::<usize>().unwrap_or(RENDER_LIMIT));
         }
         let conv = b[i];
         i += 1;
@@ -243,7 +246,10 @@ fn apply(spec: &str, file: &str, line: u32, message: &str, detail: &str) -> Stri
             }
         }
         if s.len() < width {
-            let pad = " ".repeat(width - s.len());
+            // Pad only as far as the buffer can hold: `%99999999s` must not
+            // allocate 100 MB on the way to being truncated.
+            let room = RENDER_LIMIT.saturating_sub(out.len());
+            let pad = " ".repeat((width - s.len()).min(room));
             if left {
                 s.push_str(&pad);
             } else {
@@ -251,6 +257,10 @@ fn apply(spec: &str, file: &str, line: u32, message: &str, detail: &str) -> Stri
             }
         }
         out.push_str(&s);
+        if out.len() >= RENDER_LIMIT {
+            out.truncate(RENDER_LIMIT);
+            return out;
+        }
     }
     out
 }
@@ -310,7 +320,7 @@ mod tests {
         // errfmt-mismatch applies %s to the integer; errfmt-percent-n is a
         // write primitive. Both golden .out files show the DEFAULT layout,
         // and both golden .err files carry the warning.
-        for spec in ["%s %s %s %s", "%s %n", "%99999999s", "%d %d %d %d", "%*s"] {
+        for spec in ["%s %s %s %s", "%s %n", "%d %d %d %d", "%*s"] {
             let (f, warn) = Format::from_env(Some(spec));
             assert!(warn.is_some(), "{} must be rejected", spec);
             assert_eq!(
@@ -318,6 +328,18 @@ mod tests {
                 "err-undef.asm line 0004: Label not found: (no_such_label)"
             );
         }
+    }
+
+    /// 9.5: a huge width is a CONFORMING conversion, so it is honoured rather
+    /// than rejected -- padded, then truncated at the line buffer. The
+    /// errfmt-bigwidth vector pins the result at 510 characters.
+    #[test]
+    fn a_huge_field_width_is_honoured_and_truncated_not_rejected() {
+        let (f, warn) = Format::from_env(Some("%99999999s"));
+        assert!(warn.is_none(), "a large width is conforming");
+        let out = f.render("err-undef.asm", 4, msg::LABEL_NOT_FOUND, Some("no_such_label"));
+        assert_eq!(out.len(), 510);
+        assert!(out.chars().all(|c| c == ' '), "the name never reaches the buffer");
     }
 
     #[test]

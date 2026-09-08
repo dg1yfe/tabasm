@@ -732,11 +732,15 @@ impl Enc {
     fn zw(&mut self) {
         let (a, b) = ((self.arg(0) as u32) & 0xFF, (self.arg(1) as u32) & 0xFF);
         if (0xE0..=0xEF).contains(&a) && (0xE0..=0xEF).contains(&b) {
+            // Working-register mode: the two nibbles combine into one byte via
+            // the vector path, the opcode drops by two (the Z8's `R,R` form is
+            // `x4` and its `r,r` form `x2`), and one argument byte goes.
             self.vector = Some(vec![(((a & 0x0F) << 4) | (b & 0x0F)) as u8]);
-            self.opcode_bytes = self.opcode_bytes.saturating_sub(1);
+            self.opcode = self.opcode.wrapping_sub(2);
             self.arg_bytes = 1;
         } else {
-            self.argval = ((b << 8) | a) as i32;
+            // Byte-swapped: the second operand is emitted first.
+            self.argval = ((a << 8) | b) as i32;
         }
     }
 

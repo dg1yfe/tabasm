@@ -57,6 +57,8 @@ pub struct Asm {
     source_name: String,
     line_no: u32,
     depth: usize,
+    /// Source lines processed in the last pass, for -y.
+    pub lines_read: u32,
     /// Bytes emitted by the current statement, for the listing.
     emitted: Vec<u8>,
     line_pc: u32,
@@ -102,6 +104,7 @@ impl Asm {
             source_name: String::new(),
             line_no: 0,
             depth: 0,
+            lines_read: 0,
             emitted: Vec::new(),
             line_pc: 0,
             pending: Vec::new(),
@@ -215,6 +218,7 @@ impl Asm {
             self.pass = pass;
             self.pc = 0;
             self.seen_this_pass.clear();
+            self.lines_read = 0;
             self.cond.clear();
             self.saw_end = false;
             self.segment = Segment::Null;
@@ -245,6 +249,7 @@ impl Asm {
         self.depth = depth;
         for (i, raw) in text.lines().enumerate() {
             self.line_no = i as u32 + 1;
+            self.lines_read += 1;
             self.line(raw)?;
         }
         self.file = save_file;
@@ -383,8 +388,12 @@ impl Asm {
         // 1.4 bit 0x04, on by default. Reported in pass 2, where diagnostics
         // are live; the pass-1 detection alone could never print anything.
         if !self.seen_this_pass.insert(qualified.clone()) {
-            if self.o.strict & 0x04 != 0 {
-                self.diag(msg::DUPLICATE_LABEL, Some(name.clone()));
+            // Reported in PASS 1, unlike almost everything else: the golden
+            // arg-checks.out prints it before "pass 1 complete.", and because
+            // the listing is written in pass 2 the line lands above 0001 in
+            // arg-checks.lst.
+            if self.o.strict & 0x04 != 0 && self.pass == 1 {
+                self.report(msg::DUPLICATE_LABEL, Some(name.clone()));
             }
             // 4.5: the second definition is discarded -- first wins.
             return;
@@ -403,6 +412,35 @@ impl Asm {
         }
     }
 
+    /// 1.4 bits 0x01 and 0x08, both off by default and both lexical: they look
+    /// at the operand as written, not at what it evaluates to. That is why
+    /// `%101` trips the non-unary check even though it is a valid binary
+    /// constant.
+    fn strict_operand_checks(&mut self, argt: &[String]) {
+        for a in argt {
+            let t = a.trim();
+            if t.is_empty() {
+                continue;
+            }
+            // 0x01: an operand wrapped entirely in parentheses, usually a
+            // mistaken addressing mode. The detail is the operand as written,
+            // so the diagnostic shows doubled parentheses.
+            if self.o.strict & 0x01 != 0
+                && t.starts_with('(')
+                && t.ends_with(')')
+                && matching_outer_parens(t)
+            {
+                self.diag(msg::NO_INDIRECTION, Some(t.to_string()));
+            }
+            // 0x08: an operand opening with a binary operator.
+            if self.o.strict & 0x08 != 0
+                && matches!(t.as_bytes()[0], b'%' | b'*' | b'/' | b'<' | b'>' | b'=' | b'&' | b'!')
+            {
+                self.diag(msg::NON_UNARY, Some(t.to_string()));
+            }
+        }
+    }
+
     fn eval(&mut self, text: &str) -> i32 {
         let pc = self.pc as i32;
         let compat = self.o.compatibility;
@@ -413,8 +451,7 @@ impl Asm {
             let (q, _) = Symbols::qualify(n, lc, &module);
             syms.value(&q).or_else(|| syms.value(n))
         };
-        let strict = self.o.strict;
-        let out = expr::eval_strict(text, pc, compat, lc, strict, &mut lookup);
+        let out = expr::eval_strict(text, pc, compat, lc, 0, &mut lookup);
         let diags = out.diags;
         let undefined = out.undefined;
         for d in diags {
@@ -484,6 +521,7 @@ impl Asm {
         }
 
         let argt = m.args.clone();
+        self.strict_operand_checks(&argt);
         let argv: Vec<i32> = argt.iter().map(|a| self.eval(a)).collect();
 
         let mut e = Enc {
@@ -540,12 +578,31 @@ impl Asm {
         if e.arg_bytes > 0 && e.arg_bytes < 4 && e.argval > 0 {
             let discarded = (e.argval as u32) >> (8 * e.arg_bytes as u32);
             if discarded != 0 {
-                self.diag(msg::UNUSED_MS_BYTE, Some(format!("{:X}", discarded)));
+                self.diag(msg::UNUSED_MS_BYTE, Some(format!("{:x}", discarded)));
             }
         }
 
         self.emit_and_advance(&bytes);
     }
+}
+
+/// True when the leading `(` closes only at the very end, so the whole operand
+/// is one parenthesised group rather than, say, `(a)+(b)`.
+fn matching_outer_parens(t: &str) -> bool {
+    let mut depth = 0i32;
+    for (i, c) in t.char_indices() {
+        match c {
+            '(' => depth += 1,
+            ')' => {
+                depth -= 1;
+                if depth == 0 {
+                    return i == t.len() - 1;
+                }
+            }
+            _ => {}
+        }
+    }
+    false
 }
 
 /// 4.1: a `;` outside quotes begins a comment. The embedded comment character
@@ -876,8 +933,8 @@ impl Asm {
                     let (name, _) = Symbols::truncate(l.trim_end_matches('='));
                     let (q, local) = Symbols::qualify(&name, self.local_char, &self.module);
                     if !self.seen_this_pass.insert(q.clone()) {
-                        if self.o.strict & 0x04 != 0 {
-                            self.diag(msg::DUPLICATE_LABEL, Some(name));
+                        if self.o.strict & 0x04 != 0 && self.pass == 1 {
+                            self.report(msg::DUPLICATE_LABEL, Some(name));
                         }
                     } else if self.pass == 1 {
                         self.syms.define(&q, v, self.segment, local);
@@ -983,6 +1040,7 @@ impl Asm {
             "MSFIRST" => self.ls_first = false,
             "SYM" | "AVSYM" => {
                 if self.pass == 1 {
+                    // 9.6: the directive chooses the format, not just the name.
                     self.avsym = name == "AVSYM";
                     let n = operand.trim();
                     if !n.is_empty() {
@@ -1058,28 +1116,36 @@ impl Asm {
         v
     }
 
+    /// 9.6: TWO formats, chosen by the trigger. `-s` and `.SYM` write the
+    /// plain form -- name in a 16-column field, two spaces, the value, nothing
+    /// else. `.AVSYM` writes the AVSIM51 form, which adds the `AS ` prefix and
+    /// the segment letter.
+    ///
+    /// In both, the value is lower-case hex MASKED TO 16 BITS and zero-padded
+    /// to exactly four digits, so a 32-bit label loses its high bits. The full
+    /// width survives only in the -l label table (9.8).
     fn symbol_file(&self) -> String {
         let mut s = String::new();
         for sym in self.sorted_symbols() {
-            // 9.6: printf "AS %-16s  %s%04x" -- note the value is LOWER-case
-            // hex and a label above 0xFFFF prints more than four digits.
-            s.push_str(&format!(
-                "AS {:<16}  {}:{:04x}\n",
-                sym.name,
-                sym.segment.letter(),
-                sym.value
-            ));
+            let v = (sym.value as u32) & 0xFFFF;
+            if self.avsym {
+                s.push_str(&format!("AS {:<16}  {}:{:04x}\n", sym.name, sym.segment.letter(), v));
+            } else {
+                s.push_str(&format!("{:<16}  {:04x}\n", sym.name, v));
+            }
         }
         s
     }
 
-    /// 9.7 is entirely [unknown]: no golden case produces an export file, so
-    /// neither its layout nor its exact trigger is pinned. Recorded in
-    /// the findings log; this follows the symbol file's shape.
+    /// 9.7: the export file is re-includable TASM source -- one `.EQU` line
+    /// per exported symbol, so another assembly can `.INCLUDE` it to import the
+    /// values. Format `%-16s .EQU  $%04x`: the name left-justified in a
+    /// 16-character field that GROWS rather than truncating for a longer name,
+    /// then ` .EQU  $`, then the value masked to 16 bits in lower-case hex.
     fn export_file(&self) -> String {
         let mut s = String::new();
         for sym in self.sorted_symbols().iter().filter(|s| s.exported) {
-            s.push_str(&format!("{:<16}  {:04x}\n", sym.name, sym.value));
+            s.push_str(&format!("{:<16} .EQU  ${:04x}\n", sym.name, (sym.value as u32) & 0xFFFF));
         }
         s
     }

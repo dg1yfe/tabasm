@@ -66,6 +66,7 @@ fn banner(out: &mut dyn Write) {
 }
 
 fn main() {
+    let started = std::time::Instant::now();
     let argv: Vec<String> = std::env::args().skip(1).collect();
     let tasmopts = std::env::var("TASMOPTS").ok();
     let parsed = Options::parse(&argv, tasmopts.as_deref());
@@ -139,6 +140,18 @@ fn main() {
     }
 
     let _ = write!(out, "{}", a.stdout);
+    // 1.3: -y reports elapsed time on standard output. The figures are
+    // machine-dependent, so Acceptance excludes the line the way it excludes
+    // the identity strings; a reimplementation need not match them exactly.
+    if a.o.timing {
+        let secs = started.elapsed().as_secs_f64();
+        let rate = if secs > 0.0 { (a.lines_read as f64 / secs) as u64 } else { 0 };
+        let _ = writeln!(
+            out,
+            "Elapsed time = {:.2} secs  lines = {}   lines/sec = {}",
+            secs, a.lines_read, rate
+        );
+    }
     let count = format!("{}: Number of errors = {}\n", p, a.errors);
     let _ = write!(out, "{}", count);
     let _ = out.flush();
