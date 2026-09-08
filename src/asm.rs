@@ -1106,20 +1106,37 @@ impl Asm {
 
 impl Asm {
     /// The order symbols appear in the symbol file, the export file and the
-    /// -l/-ll label tables (2.1).
+    /// -l/-ll label tables.
     ///
-    /// This is a COCKTAIL (bidirectional bubble) SORT keyed on the first
-    /// character, whose bookkeeping terminates early -- so for some inputs the
-    /// result is not fully sorted, and the residual disorder is deterministic
-    /// and observable. It must be reproduced as the procedure, not by a
-    /// correct sort: `k` records the last swap and is carried across BOTH
-    /// sweeps, the boundaries collapse around it, and the loop stops the
-    /// moment `top >= bot` rather than when a sweep makes no swap.
+    /// By default this is a proper lexical sort, which is what a symbol list
+    /// is for. `--broken-sort-compatibility` instead reproduces the original's
+    /// ordering exactly; see `shaker_order`.
+    pub fn sorted_symbols(&self) -> Vec<&crate::symbols::Symbol> {
+        if self.o.broken_sort {
+            return self.shaker_order();
+        }
+        let mut v: Vec<&crate::symbols::Symbol> = self.syms.list.iter().collect();
+        // Names are unique -- a duplicate definition is rejected and discarded
+        // (4.5) -- so stability is irrelevant and the unstable sort is fine.
+        v.sort_unstable_by(|a, b| a.name.cmp(&b.name));
+        v
+    }
+
+    /// The original's ordering (2.1): a COCKTAIL (bidirectional bubble) SORT
+    /// keyed on the first character, whose bookkeeping terminates early -- so
+    /// for some inputs the result is not fully sorted, deterministically.
     ///
-    /// One pass usually leaves the table ordered, which is why every golden
+    /// It must be reproduced as the procedure, not by a correct sort: `k`
+    /// records the last swap and is carried across BOTH sweeps, the boundaries
+    /// collapse around it, and the loop stops the moment `top >= bot` rather
+    /// than when a sweep makes no swap. Because `top` and `bot` bound
+    /// COMPARISONS rather than elements, that test discards the final
+    /// comparison and can leave one inversion standing.
+    ///
+    /// One pass usually leaves the table ordered, which is why every 8051
     /// vector and nine of the eleven reference programs look sorted; 6805 and
     /// 6800 are where it shows.
-    pub fn sorted_symbols(&self) -> Vec<&crate::symbols::Symbol> {
+    fn shaker_order(&self) -> Vec<&crate::symbols::Symbol> {
         fn key(s: &crate::symbols::Symbol) -> u8 {
             s.name.as_bytes().first().copied().unwrap_or(0)
         }
@@ -1373,6 +1390,10 @@ mod tests {
     /// 2.1's worked example: labels defined `bee dee ayy azz ell` (first
     /// characters b d a a l) come out `ayy bee azz dee ell` -- a b a d l, NOT
     /// the fully sorted a a b d l. The early stop leaves `bee` ahead of `azz`.
+    ///
+    /// This is what --broken-sort-compatibility reproduces; the default sorts
+    /// properly. The procedure is duplicated here rather than exercised
+    /// through Asm because building one needs a loaded table.
     #[test]
     fn the_cocktail_sort_stops_early_as_specified() {
         fn order(names: &[&str]) -> Vec<String> {
@@ -1420,5 +1441,20 @@ mod tests {
             order(&["labimm", "lab2", "lab3", "lab5", "labbt_1", "bit", "lab4", "jlab", "jlab5"]),
             ["bit", "jlab", "jlab5", "labimm", "lab2", "lab3", "lab5", "labbt_1", "lab4"]
         );
+    }
+
+    /// The default ordering is a full lexical sort, so the cases the original
+    /// leaves unsorted come out properly ordered -- and so do the ones it
+    /// merely bucketed by first character.
+    #[test]
+    fn the_default_ordering_is_a_full_lexical_sort() {
+        let mut v = vec!["bit3", "data", "addz", "addr", "loop1"];
+        v.sort_unstable();
+        assert_eq!(v, ["addr", "addz", "bit3", "data", "loop1"]);
+        // The original bucketed these by first character only, leaving
+        // definition order inside the bucket: labimm, lab2, lab3, lab5, ...
+        let mut v = vec!["labimm", "lab2", "lab3", "lab5", "labbt_1", "bit", "lab4"];
+        v.sort_unstable();
+        assert_eq!(v, ["bit", "lab2", "lab3", "lab4", "lab5", "labbt_1", "labimm"]);
     }
 }
