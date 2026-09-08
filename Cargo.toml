@@ -9,6 +9,12 @@ description = "Clean-room reimplementation of the TASM table-driven cross-assemb
 name = "tabasm"
 path = "src/main.rs"
 
+# Converts a legacy table to the current format. Shipped because the loader
+# still reads legacy tables, so a user may hold some.
+[[bin]]
+name = "tab1to2"
+path = "src/bin/tab1to2.rs"
+
 # No dependencies, by intent: the assembler is pure std. Nothing here descends
 # from the original implementation -- see AGENTS.md.
 

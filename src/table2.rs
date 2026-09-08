@@ -446,108 +446,111 @@ pub fn display(args: &str) -> String {
     out
 }
 
+/// Render a table as v2 source. Used by the `tab1to2` converter and by the
+/// round-trip test.
+///
+/// `banner` overrides the table's own, which is how a converted table stops
+/// carrying the original product's name.
+pub fn render(t: &Table, banner: Option<&str>) -> String {
+    let mut s = String::new();
+    s.push_str("%format         2\n");
+    s.push_str(&format!("%banner         \"{}\"\n", banner.unwrap_or(&t.banner)));
+    s.push_str(&format!(
+        "%opcode-order   {}\n",
+        if t.msfirst { "ms-first" } else { "ls-first" }
+    ));
+    s.push_str(&format!(
+        "%address-unit   {}\n",
+        if t.wordaddrs { "word" } else { "byte" }
+    ));
+    s.push_str(&format!("%aux-registers  {}\n", t.aux_registers));
+    for r in &t.regsets {
+        s.push_str(&format!(
+            "%regset         \"{}\" mask={:X} class={:X}\n",
+            r.name, r.mask, r.class
+        ));
+    }
+    s.push_str("%columns        mnemonic operands opcode op-bytes arg-bytes rule\n");
+    for r in &t.rows {
+        // v1 spells the wildcard per table and the register slot `!`.
+        let mut pat = String::new();
+        if r.args == "\"\"" {
+            pat.push('-');
+        } else {
+            for c in r.args.chars() {
+                if c == t.wildcard {
+                    pat.push_str("<expr>");
+                } else if c == t.regmark as char {
+                    pat.push_str("<reg>");
+                } else {
+                    pat.push(c);
+                }
+            }
+        }
+        let mut params = String::new();
+        if r.class != 1 {
+            params.push_str(&format!(" class={:X}", r.class));
+        }
+        let allowed = params_for(r.rule);
+        if allowed.contains(&"page-mask") && r.or != 0 {
+            params.push_str(&format!(" page-mask={:X}", r.or));
+        } else if allowed.contains(&"valid-mask") && r.or != 0 {
+            params.push_str(&format!(" valid-mask={:X}", r.or));
+        } else if allowed.contains(&"field-mask") && r.or != 0 {
+            params.push_str(&format!(" field-mask={:X}", r.or));
+        }
+        if allowed.contains(&"set-bits") && r.shift != 0 {
+            params.push_str(&format!(" set-bits={:X}", r.shift));
+        } else if allowed.contains(&"opcode-xor") && r.shift != 0 {
+            params.push_str(&format!(" opcode-xor={:X}", r.shift));
+        } else if allowed.contains(&"shift") {
+            if r.shift & 0x0F != 0 {
+                params.push_str(&format!(" shift={:X}", r.shift & 0x0F));
+            }
+            if r.shift & 0xF0 != 0 {
+                params.push_str(" invert=yes");
+            }
+        }
+        if r.post_shift != 0 {
+            params.push_str(&format!(" post-shift={:X}", r.post_shift));
+        }
+        if r.post_or != 0 {
+            params.push_str(&format!(" post-or={:X}", r.post_or));
+        }
+        s.push_str(&format!(
+            "{} {} {:0width$X} {} {} {}{}\n",
+            r.mnemonic,
+            pat,
+            r.opcode,
+            r.opcode_bytes,
+            r.arg_bytes,
+            name_for(r.rule),
+            params,
+            width = r.opcode_bytes as usize * 2,
+        ));
+    }
+    s
+}
+
+pub fn name_for(rule: Rule) -> &'static str {
+    for n in [
+        "plain", "jmp-page-2k", "jmp-page-256", "rel8", "zero-page", "zero-page-moto",
+        "bit-moto", "bit-z80", "index-z80", "combine", "combine-rel", "combine-swapped",
+        "swap-bytes", "three-rel", "tms-fold", "tms-dma", "tms-long", "tms-long-swapped",
+        "tms-aux", "tms7000-trap", "rel16", "i8096-combine", "i8096-short-long-2",
+        "i8096-short-long-3", "i8096-jump-bit", "i8096-rel11", "i8096-indexed",
+        "i8096-short-long-1", "i8096-combine-swapped",
+    ] {
+        if rule_for(n) == Some(rule) {
+            return n;
+        }
+    }
+    panic!("no v2 name for rule {:?}", rule);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// Render a v1-loaded table as v2 source. Used only by the round-trip test
-    /// below; a shipped converter would be this plus file handling.
-    fn render(t: &Table) -> String {
-        let mut s = String::new();
-        s.push_str("%format         2\n");
-        s.push_str(&format!("%banner         \"{}\"\n", t.banner));
-        s.push_str(&format!(
-            "%opcode-order   {}\n",
-            if t.msfirst { "ms-first" } else { "ls-first" }
-        ));
-        s.push_str(&format!(
-            "%address-unit   {}\n",
-            if t.wordaddrs { "word" } else { "byte" }
-        ));
-        s.push_str(&format!("%aux-registers  {}\n", t.aux_registers));
-        for r in &t.regsets {
-            s.push_str(&format!(
-                "%regset         \"{}\" mask={:X} class={:X}\n",
-                r.name, r.mask, r.class
-            ));
-        }
-        s.push_str("%columns        mnemonic operands opcode op-bytes arg-bytes rule\n");
-        for r in &t.rows {
-            // v1 spells the wildcard per table and the register slot `!`.
-            let mut pat = String::new();
-            if r.args == "\"\"" {
-                pat.push('-');
-            } else {
-                for c in r.args.chars() {
-                    if c == t.wildcard {
-                        pat.push_str("<expr>");
-                    } else if c == t.regmark as char {
-                        pat.push_str("<reg>");
-                    } else {
-                        pat.push(c);
-                    }
-                }
-            }
-            let mut params = String::new();
-            if r.class != 1 {
-                params.push_str(&format!(" class={:X}", r.class));
-            }
-            let allowed = params_for(r.rule);
-            if allowed.contains(&"page-mask") && r.or != 0 {
-                params.push_str(&format!(" page-mask={:X}", r.or));
-            } else if allowed.contains(&"valid-mask") && r.or != 0 {
-                params.push_str(&format!(" valid-mask={:X}", r.or));
-            } else if allowed.contains(&"field-mask") && r.or != 0 {
-                params.push_str(&format!(" field-mask={:X}", r.or));
-            }
-            if allowed.contains(&"set-bits") && r.shift != 0 {
-                params.push_str(&format!(" set-bits={:X}", r.shift));
-            } else if allowed.contains(&"opcode-xor") && r.shift != 0 {
-                params.push_str(&format!(" opcode-xor={:X}", r.shift));
-            } else if allowed.contains(&"shift") {
-                if r.shift & 0x0F != 0 {
-                    params.push_str(&format!(" shift={:X}", r.shift & 0x0F));
-                }
-                if r.shift & 0xF0 != 0 {
-                    params.push_str(" invert=yes");
-                }
-            }
-            if r.post_shift != 0 {
-                params.push_str(&format!(" post-shift={:X}", r.post_shift));
-            }
-            if r.post_or != 0 {
-                params.push_str(&format!(" post-or={:X}", r.post_or));
-            }
-            s.push_str(&format!(
-                "{} {} {:0width$X} {} {} {}{}\n",
-                r.mnemonic,
-                pat,
-                r.opcode,
-                r.opcode_bytes,
-                r.arg_bytes,
-                name_for(r.rule),
-                params,
-                width = r.opcode_bytes as usize * 2,
-            ));
-        }
-        s
-    }
-
-    fn name_for(rule: Rule) -> &'static str {
-        for n in [
-            "plain", "jmp-page-2k", "jmp-page-256", "rel8", "zero-page", "zero-page-moto",
-            "bit-moto", "bit-z80", "index-z80", "combine", "combine-rel", "combine-swapped",
-            "swap-bytes", "three-rel", "tms-fold", "tms-dma", "tms-long", "tms-long-swapped",
-            "tms-aux", "tms7000-trap", "rel16", "i8096-combine", "i8096-short-long-2",
-            "i8096-short-long-3", "i8096-jump-bit", "i8096-rel11", "i8096-indexed",
-            "i8096-short-long-1", "i8096-combine-swapped",
-        ] {
-            if rule_for(n) == Some(rule) {
-                return n;
-            }
-        }
-        panic!("no v2 name for rule {:?}", rule);
-    }
 
     const TABLES: [&str; 11] =
         ["05", "3210", "3225", "48", "51", "65", "68", "70", "80", "85", "96"];
@@ -559,7 +562,7 @@ mod tests {
     fn every_shipped_table_survives_a_round_trip_through_v2() {
         for sel in TABLES {
             let v1 = Table::load(&format!("tables/tasm{}.tab", sel), sel).ok().unwrap();
-            let text = render(&v1);
+            let text = render(&v1, None);
             let v2 = match parse(&text, sel) {
                 Ok(t) => t,
                 Err(LoadError::Syntax(line, what)) => {

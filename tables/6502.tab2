@@ -1,0 +1,175 @@
+%format         2
+%banner         "Table-driven 6502 Assembler"
+%opcode-order   ls-first
+%address-unit   byte
+%aux-registers  2
+%columns        mnemonic operands opcode op-bytes arg-bytes rule
+ADC #<expr> 69 1 1 plain
+ADC (<expr>,X) 61 1 1 plain
+ADC (<expr>),Y 71 1 1 plain
+ADC (<expr>) 72 1 1 plain class=2
+ADC <expr>,X 7D 1 2 zero-page
+ADC <expr>,Y 79 1 2 plain
+ADC <expr> 6D 1 2 zero-page
+AND #<expr> 29 1 1 plain
+AND (<expr>,X) 21 1 1 plain
+AND (<expr>),Y 31 1 1 plain
+AND (<expr>) 32 1 1 plain class=2
+AND <expr>,X 3D 1 2 zero-page
+AND <expr>,Y 39 1 2 plain
+AND <expr> 2D 1 2 zero-page
+ASL A 0A 1 0 plain
+ASL <expr>,X 1E 1 2 zero-page
+ASL <expr> 0E 1 2 zero-page
+BBR0 <expr>,<expr> 0F 1 2 combine-rel class=6
+BBR1 <expr>,<expr> 1F 1 2 combine-rel class=6
+BBR2 <expr>,<expr> 2F 1 2 combine-rel class=6
+BBR3 <expr>,<expr> 3F 1 2 combine-rel class=6
+BBR4 <expr>,<expr> 4F 1 2 combine-rel class=6
+BBR5 <expr>,<expr> 5F 1 2 combine-rel class=6
+BBR6 <expr>,<expr> 6F 1 2 combine-rel class=6
+BBR7 <expr>,<expr> 7F 1 2 combine-rel class=6
+BBS0 <expr>,<expr> 8F 1 2 combine-rel class=6
+BBS1 <expr>,<expr> 9F 1 2 combine-rel class=6
+BBS2 <expr>,<expr> AF 1 2 combine-rel class=6
+BBS3 <expr>,<expr> BF 1 2 combine-rel class=6
+BBS4 <expr>,<expr> CF 1 2 combine-rel class=6
+BBS5 <expr>,<expr> DF 1 2 combine-rel class=6
+BBS6 <expr>,<expr> EF 1 2 combine-rel class=6
+BBS7 <expr>,<expr> FF 1 2 combine-rel class=6
+BCC <expr> 90 1 1 rel8
+BCS <expr> B0 1 1 rel8
+BEQ <expr> F0 1 1 rel8
+BMI <expr> 30 1 1 rel8
+BNE <expr> D0 1 1 rel8
+BPL <expr> 10 1 1 rel8
+BRA <expr> 80 1 1 rel8 class=6
+BVC <expr> 50 1 1 rel8
+BVS <expr> 70 1 1 rel8
+BIT #<expr> 89 1 1 plain class=2
+BIT <expr>,X 3C 1 2 zero-page class=2
+BIT <expr> 2C 1 2 zero-page
+BRK - 00 1 0 plain
+CLC - 18 1 0 plain
+CLD - D8 1 0 plain
+CLI - 58 1 0 plain
+CLV - B8 1 0 plain
+CMP #<expr> C9 1 1 plain
+CMP (<expr>,X) C1 1 1 plain
+CMP (<expr>),Y D1 1 1 plain
+CMP (<expr>) D2 1 1 plain class=2
+CMP <expr>,X DD 1 2 zero-page
+CMP <expr>,Y D9 1 2 plain
+CMP <expr> CD 1 2 zero-page
+CPX #<expr> E0 1 1 plain
+CPX <expr> EC 1 2 zero-page
+CPY #<expr> C0 1 1 plain
+CPY <expr> CC 1 2 zero-page
+DEC A 3A 1 0 plain class=2
+DEC <expr>,X DE 1 2 zero-page
+DEC <expr> CE 1 2 zero-page
+DEX - CA 1 0 plain
+DEY - 88 1 0 plain
+EOR #<expr> 49 1 1 plain
+EOR (<expr>,X) 41 1 1 plain
+EOR (<expr>),Y 51 1 1 plain
+EOR (<expr>) 52 1 1 plain class=2
+EOR <expr>,X 5D 1 2 zero-page
+EOR <expr>,Y 59 1 2 plain
+EOR <expr> 4D 1 2 zero-page
+INC A 1A 1 0 plain class=2
+INC <expr>,X FE 1 2 zero-page
+INC <expr> EE 1 2 zero-page
+INX - E8 1 0 plain
+INY - C8 1 0 plain
+JMP (<expr>,X) 7C 1 2 plain class=2
+JMP (<expr>) 6C 1 2 plain
+JMP <expr> 4C 1 2 plain
+JSR <expr> 20 1 2 plain
+LDA #<expr> A9 1 1 plain
+LDA (<expr>,X) A1 1 1 plain
+LDA (<expr>),Y B1 1 1 plain
+LDA (<expr>) B2 1 1 plain class=2
+LDA <expr>,X BD 1 2 zero-page
+LDA <expr>,Y B9 1 2 plain
+LDA <expr> AD 1 2 zero-page
+LDX #<expr> A2 1 1 plain
+LDX <expr>,Y BE 1 2 zero-page
+LDX <expr> AE 1 2 zero-page
+LDY #<expr> A0 1 1 plain
+LDY <expr>,X BC 1 2 zero-page
+LDY <expr> AC 1 2 zero-page
+LSR A 4A 1 0 plain
+LSR <expr>,X 5E 1 2 zero-page
+LSR <expr> 4E 1 2 zero-page
+MUL - 02 1 0 plain class=4
+NOP - EA 1 0 plain
+ORA #<expr> 09 1 1 plain
+ORA (<expr>,X) 01 1 1 plain
+ORA (<expr>),Y 11 1 1 plain
+ORA (<expr>) 12 1 1 plain class=2
+ORA <expr>,X 1D 1 2 zero-page
+ORA <expr>,Y 19 1 2 plain
+ORA <expr> 0D 1 2 zero-page
+PHA - 48 1 0 plain
+PHP - 08 1 0 plain
+PHX - DA 1 0 plain class=6
+PHY - 5A 1 0 plain class=6
+PLA - 68 1 0 plain
+PLP - 28 1 0 plain
+PLX - FA 1 0 plain class=6
+PLY - 7A 1 0 plain class=6
+RMB0 <expr> 07 1 1 plain class=6
+RMB1 <expr> 17 1 1 plain class=6
+RMB2 <expr> 27 1 1 plain class=6
+RMB3 <expr> 37 1 1 plain class=6
+RMB4 <expr> 47 1 1 plain class=6
+RMB5 <expr> 57 1 1 plain class=6
+RMB6 <expr> 67 1 1 plain class=6
+RMB7 <expr> 77 1 1 plain class=6
+ROL A 2A 1 0 plain
+ROL <expr>,X 3E 1 2 zero-page
+ROL <expr> 2E 1 2 zero-page
+ROR A 6A 1 0 plain
+ROR <expr>,X 7E 1 2 zero-page
+ROR <expr> 6E 1 2 zero-page
+RTI - 40 1 0 plain
+RTS - 60 1 0 plain
+SBC #<expr> E9 1 1 plain
+SBC (<expr>,X) E1 1 1 plain
+SBC (<expr>),Y F1 1 1 plain
+SBC (<expr>) F2 1 1 plain class=2
+SBC <expr>,X FD 1 2 zero-page
+SBC <expr>,Y F9 1 2 plain
+SBC <expr> ED 1 2 zero-page
+SEC - 38 1 0 plain
+SED - F8 1 0 plain
+SEI - 78 1 0 plain
+SMB0 <expr> 87 1 1 plain class=6
+SMB1 <expr> 97 1 1 plain class=6
+SMB2 <expr> A7 1 1 plain class=6
+SMB3 <expr> B7 1 1 plain class=6
+SMB4 <expr> C7 1 1 plain class=6
+SMB5 <expr> D7 1 1 plain class=6
+SMB6 <expr> E7 1 1 plain class=6
+SMB7 <expr> F7 1 1 plain class=6
+STA (<expr>,X) 81 1 1 plain
+STA (<expr>),Y 91 1 1 plain
+STA (<expr>) 92 1 1 plain class=2
+STA <expr>,X 9D 1 2 zero-page
+STA <expr>,Y 99 1 2 plain
+STA <expr> 8D 1 2 zero-page
+STX <expr>,Y 96 1 1 zero-page
+STX <expr> 8E 1 2 zero-page
+STY <expr>,X 94 1 1 plain
+STY <expr> 8C 1 2 zero-page
+STZ <expr>,X 9E 1 2 zero-page class=2
+STZ <expr> 9C 1 2 zero-page class=2
+TAX - AA 1 0 plain
+TAY - A8 1 0 plain
+TRB <expr> 1C 1 2 zero-page class=2
+TSB <expr> 0C 1 2 zero-page class=2
+TSX - BA 1 0 plain
+TXA - 8A 1 0 plain
+TXS - 9A 1 0 plain
+TYA - 98 1 0 plain

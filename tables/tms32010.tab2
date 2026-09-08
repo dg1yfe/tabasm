@@ -1,0 +1,139 @@
+%format         2
+%banner         "Table-driven TMS32010 Assembler"
+%opcode-order   ms-first
+%address-unit   word
+%aux-registers  2
+%regset         "*+" mask=A0 class=1
+%regset         "*-" mask=90 class=1
+%regset         "*" mask=80 class=1
+%columns        mnemonic operands opcode op-bytes arg-bytes rule
+ABS - 7F88 2 0 plain
+ADD <reg>,<expr>,<expr> 0000 2 0 tms-fold valid-mask=F00 shift=8
+ADD <reg>,<expr> 0008 2 0 tms-fold valid-mask=F00 shift=8
+ADD <reg> 0008 2 0 plain
+ADD <expr>,<expr> 0000 2 0 tms-dma valid-mask=F00 shift=8
+ADD <expr> 0000 2 0 tms-fold valid-mask=7F
+ADDH <reg>,<expr> 6000 2 0 tms-fold valid-mask=1
+ADDH <reg> 6008 2 0 plain
+ADDH <expr> 6000 2 0 tms-fold valid-mask=7F
+ADDS <reg>,<expr> 6100 2 0 tms-fold valid-mask=1
+ADDS <reg> 6108 2 0 plain
+ADDS <expr> 6100 2 0 tms-fold valid-mask=7F
+AND <reg>,<expr> 7900 2 0 tms-fold valid-mask=1
+AND <reg> 7908 2 0 plain
+AND <expr> 7900 2 0 tms-fold valid-mask=7F
+APAC - 7F8F 2 0 plain
+B <expr> F900 2 2 swap-bytes
+BANZ <expr> F400 2 2 swap-bytes
+BGEZ <expr> FD00 2 2 swap-bytes
+BGZ <expr> FC00 2 2 swap-bytes
+BIOZ <expr> F600 2 2 swap-bytes
+BLEZ <expr> FB00 2 2 swap-bytes
+BLZ <expr> FA00 2 2 swap-bytes
+BNZ <expr> FE00 2 2 swap-bytes
+BV <expr> F500 2 2 swap-bytes
+BZ <expr> FF00 2 2 swap-bytes
+CALA - 7F8C 2 0 plain
+CALL <expr> F800 2 2 swap-bytes
+DINT - 7F81 2 0 plain
+DMOV <reg>,<expr> 6900 2 0 tms-fold valid-mask=1
+DMOV <reg> 6908 2 0 plain
+DMOV <expr> 6900 2 0 tms-fold valid-mask=7F
+EINT - 7F82 2 0 plain
+IN <reg>,<expr>,<expr> 4000 2 0 tms-fold valid-mask=700 shift=8
+IN <reg>,<expr> 4008 2 0 tms-fold valid-mask=700 shift=8
+IN <expr>,<expr> 4000 2 0 tms-dma valid-mask=700 shift=8
+LAC <reg>,<expr>,<expr> 2000 2 0 tms-fold valid-mask=F00 shift=8
+LAC <reg>,<expr> 2008 2 0 tms-fold valid-mask=F00 shift=8
+LAC <reg> 2008 2 0 plain
+LAC <expr>,<expr> 2000 2 0 tms-dma valid-mask=F00 shift=8
+LAC <expr> 2000 2 0 tms-fold valid-mask=7F
+LACK <expr> 7E00 2 0 tms-fold valid-mask=FF
+LAR <expr>,<reg>,<expr> 3800 2 0 tms-aux valid-mask=1
+LAR <expr>,<reg> 3808 2 0 tms-aux valid-mask=1
+LAR <expr>,<expr> 3800 2 0 tms-aux valid-mask=7F
+LARK <expr>,<expr> 7000 2 0 tms-aux valid-mask=FF
+LARP <expr> 6880 2 0 tms-fold valid-mask=1
+LDP <reg>,<expr> 6F00 2 0 tms-fold valid-mask=1
+LDP <reg> 6F08 2 0 plain
+LDP <expr> 6F00 2 0 tms-fold valid-mask=7F
+LDPK <expr> 6E00 2 0 tms-fold valid-mask=1
+LST <reg>,<expr> 7B00 2 0 tms-fold valid-mask=1
+LST <reg> 7B08 2 0 plain
+LST <expr> 7B00 2 0 tms-fold valid-mask=7F
+LT <reg>,<expr> 6A00 2 0 tms-fold valid-mask=1
+LT <reg> 6A08 2 0 plain
+LT <expr> 6A00 2 0 tms-fold valid-mask=7F
+LTA <reg>,<expr> 6C00 2 0 tms-fold valid-mask=1
+LTA <reg> 6C08 2 0 plain
+LTA <expr> 6C00 2 0 tms-fold valid-mask=7F
+LTD <reg>,<expr> 6B00 2 0 tms-fold valid-mask=1
+LTD <reg> 6B08 2 0 plain
+LTD <expr> 6B00 2 0 tms-fold valid-mask=7F
+MAR <reg>,<expr> 6800 2 0 tms-fold valid-mask=1
+MAR <reg> 6808 2 0 plain
+MAR <expr> 6800 2 0 tms-fold valid-mask=7F
+MPY <reg>,<expr> 6D00 2 0 tms-fold valid-mask=1
+MPY <reg> 6D08 2 0 plain
+MPY <expr> 6D00 2 0 tms-fold valid-mask=7F
+MPYK <expr> 8000 2 0 tms-fold valid-mask=1FFF
+NOP - 7F80 2 0 plain
+OR <reg>,<expr> 7A00 2 0 tms-fold valid-mask=1
+OR <reg> 7A08 2 0 plain
+OR <expr> 7A00 2 0 tms-fold valid-mask=7F
+OUT <reg>,<expr>,<expr> 4800 2 0 tms-fold valid-mask=700 shift=8
+OUT <reg>,<expr> 4808 2 0 tms-fold valid-mask=700 shift=8
+OUT <expr>,<expr> 4800 2 0 tms-dma valid-mask=700 shift=8
+PAC - 7F8E 2 0 plain
+POP - 7F9D 2 0 plain
+PUSH - 7F9C 2 0 plain
+RET - 7F8D 2 0 plain
+ROVM - 7F8A 2 0 plain
+SACH <reg>,<expr>,<expr> 5800 2 0 tms-fold valid-mask=500 shift=8
+SACH <reg>,<expr> 5808 2 0 tms-fold valid-mask=500 shift=8
+SACH <reg> 5808 2 0 plain
+SACH <expr>,<expr> 5800 2 0 tms-dma valid-mask=500 shift=8
+SACH <expr> 5800 2 0 tms-fold valid-mask=7F
+SACL <reg>,<expr>,<expr> 5000 2 0 tms-fold shift=8
+SACL <reg>,<expr> 5008 2 0 tms-fold shift=8
+SACL <reg> 5008 2 0 plain
+SACL <expr>,<expr> 5000 2 0 tms-dma shift=8
+SACL <expr> 5000 2 0 tms-fold valid-mask=7F
+SAR <expr>,<reg>,<expr> 3000 2 0 tms-aux valid-mask=1
+SAR <expr>,<reg> 3008 2 0 tms-aux valid-mask=1
+SAR <expr>,<expr> 3000 2 0 tms-aux valid-mask=7F
+SOVM - 7F8B 2 0 plain
+SPAC - 7F90 2 0 plain
+SST <reg>,<expr> 7C00 2 0 tms-fold valid-mask=1
+SST <reg> 7C08 2 0 plain
+SST <expr> 7C00 2 0 tms-fold valid-mask=7F
+SUB <reg>,<expr>,<expr> 1000 2 0 tms-fold valid-mask=F00 shift=8
+SUB <reg>,<expr> 1008 2 0 tms-fold valid-mask=F00 shift=8
+SUB <reg> 1008 2 0 plain
+SUB <expr>,<expr> 1000 2 0 tms-dma valid-mask=F00 shift=8
+SUB <expr> 1000 2 0 tms-fold valid-mask=7F
+SUBC <reg>,<expr> 6400 2 0 tms-fold valid-mask=1
+SUBC <reg> 6408 2 0 plain
+SUBC <expr> 6400 2 0 tms-fold valid-mask=7F
+SUBH <reg>,<expr> 6200 2 0 tms-fold valid-mask=1
+SUBH <reg> 6208 2 0 plain
+SUBH <expr> 6200 2 0 tms-fold valid-mask=7F
+SUBS <reg>,<expr> 6300 2 0 tms-fold valid-mask=1
+SUBS <reg> 6308 2 0 plain
+SUBS <expr> 6300 2 0 tms-fold valid-mask=7F
+TBLR <reg>,<expr> 6700 2 0 tms-fold valid-mask=1
+TBLR <reg> 6708 2 0 plain
+TBLR <expr> 6700 2 0 tms-fold valid-mask=7F
+TBLW <reg>,<expr> 7D00 2 0 tms-fold valid-mask=1
+TBLW <reg> 7D08 2 0 plain
+TBLW <expr> 7D00 2 0 tms-fold valid-mask=7F
+XOR <reg>,<expr> 7800 2 0 tms-fold valid-mask=1
+XOR <reg> 7808 2 0 plain
+XOR <expr> 7800 2 0 tms-fold valid-mask=7F
+ZAC - 7F89 2 0 plain
+ZALH <reg>,<expr> 6500 2 0 tms-fold valid-mask=1
+ZALH <reg> 6508 2 0 plain
+ZALH <expr> 6500 2 0 tms-fold valid-mask=7F
+ZALS <reg>,<expr> 6600 2 0 tms-fold valid-mask=1
+ZALS <reg> 6608 2 0 plain
+ZALS <expr> 6600 2 0 tms-fold valid-mask=7F
