@@ -755,32 +755,42 @@ mod diagnostics {
         assert!(parse("; nothing here\n", "51").is_err());
     }
 
-    /// The dispatch of §D5: a `.tab2` beside a `.tab` wins, and content decides
-    /// the format regardless of the name.
+    /// The format is decided by content, and `load_first` takes the first path
+    /// that exists. Ordering itself is `cli::table_paths`, tested there.
     #[test]
-    fn load_prefers_a_v2_table_and_sniffs_the_format() {
+    fn load_first_takes_the_first_path_present_and_sniffs_the_format() {
         let dir = std::env::temp_dir().join("tabasm-v2-dispatch");
         let _ = std::fs::create_dir_all(&dir);
         let v1 = dir.join("tasm77.tab");
+        let v2 = dir.join("77.tab2");
         std::fs::write(&v1, "\"v1 banner\"\nNOP \"\" 00 1 NOP 1\n").unwrap();
-        let t = Table::load(v1.to_str().unwrap(), "77").ok().unwrap();
+        let _ = std::fs::remove_file(&v2);
+
+        // Only the legacy file exists, so it is used.
+        let paths = vec![v2.to_string_lossy().into(), v1.to_string_lossy().into()];
+        let t = Table::load_first(&paths, "77").ok().unwrap();
         assert_eq!(t.banner, "v1 banner");
         assert_eq!(t.regmark, b'!');
 
-        // A .tab2 alongside it takes precedence.
+        // Once the v2 file exists it comes first in the list and wins.
         std::fs::write(
-            dir.join("tasm77.tab2"),
+            &v2,
             "%format 2\n%banner \"v2 banner\"\n%columns mnemonic operands opcode op-bytes arg-bytes rule\nNOP - 00 1 0 plain\n",
         )
         .unwrap();
-        let t = Table::load(v1.to_str().unwrap(), "77").ok().unwrap();
+        let t = Table::load_first(&paths, "77").ok().unwrap();
         assert_eq!(t.banner, "v2 banner");
         assert_eq!(t.regmark, REG);
 
-        // And a v2 table under a .tab name is still v2.
+        // Content decides, not the name: a v2 table called `.tab` is still v2.
         let odd = dir.join("tasm78.tab");
-        std::fs::write(&odd, "; a v2 table named .tab\n%format 2\n%banner \"sniffed\"\n%columns mnemonic operands opcode op-bytes arg-bytes rule\nNOP - 00 1 0 plain\n").unwrap();
-        assert_eq!(Table::load(odd.to_str().unwrap(), "78").ok().unwrap().banner, "sniffed");
+        std::fs::write(&odd, "; a v2 table under a legacy name\n%format 2\n%banner \"sniffed\"\n%columns mnemonic operands opcode op-bytes arg-bytes rule\nNOP - 00 1 0 plain\n").unwrap();
+        let one = vec![odd.to_string_lossy().into()];
+        assert_eq!(Table::load_first(&one, "78").ok().unwrap().banner, "sniffed");
+
+        // Nothing present at all is an Open error naming the first candidate.
+        let missing = vec!["/nonexistent/99.tab2".to_string(), "/nonexistent/tasm99.tab".to_string()];
+        assert!(matches!(Table::load_first(&missing, "99"), Err(LoadError::Open(_))));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }

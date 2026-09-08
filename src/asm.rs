@@ -26,7 +26,6 @@ pub struct Asm {
     pub macs: Macros,
     pub img: Image,
     pub fmt: Format,
-    pub prog: &'static str,
 
     pass: u8,
     pc: u32,
@@ -81,7 +80,7 @@ pub struct Asm {
 }
 
 impl Asm {
-    pub fn new(o: Options, table: Table, fmt: Format, prog: &'static str) -> Asm {
+    pub fn new(o: Options, table: Table, fmt: Format) -> Asm {
         let ignore_case = o.ignore_case;
         let fill = o.fill.unwrap_or(0);
         Asm {
@@ -90,7 +89,6 @@ impl Asm {
             macs: Macros::new(),
             img: Image::new(fill),
             fmt,
-            prog,
             pass: 1,
             pc: 0,
             errors: 0,
@@ -124,6 +122,11 @@ impl Asm {
             seen_this_pass: std::collections::HashSet::new(),
             o,
         }
+    }
+
+    /// The name on the assembler's own messages -- `--message-prefix`.
+    fn prog(&self) -> &str {
+        &self.o.message_prefix
     }
 
     // --- addressing ---------------------------------------------------------
@@ -262,7 +265,7 @@ impl Asm {
                 self.diag(msg::NO_END, None);
             }
             self.stdout
-                .push_str(&format!("{}: pass {} complete.\n", self.prog, pass));
+                .push_str(&format!("{}: pass {} complete.\n", self.prog(), pass));
             // 1.3: -z writes free-form tracing to standard error. Its content
             // is explicitly not a stable interface, so this is our own.
             if self.o.debug {
@@ -1447,23 +1450,13 @@ impl Asm {
         out
     }
 
-    /// The second heading line. `.TITLE` sets it, but 9.4 never says what it
-    /// defaults to -- and the golden 51-paged.lst, whose source has no .TITLE,
-    /// carries the ORIGINAL PRODUCT'S VENDOR NAME there. That string appears
-    /// nowhere in the specification, tables/ or examples/.
-    ///
-    /// It is identification, not behaviour, so it follows the same rule as the
-    /// message prefix: --report-compatibility reproduces it so the vector
-    /// compares, and without the flag tabasm prints its own. See
-    /// the findings log.
+    /// The second heading line: `.TITLE` if the source set one, otherwise
+    /// whatever `--page-title` says.
     fn page_title(&self) -> String {
-        if !self.title.is_empty() {
-            return self.title.clone();
-        }
-        if self.o.report_compatibility {
-            "tabasm".to_string()
+        if self.title.is_empty() {
+            self.o.page_title.clone()
         } else {
-            "tabasm".to_string()
+            self.title.clone()
         }
     }
 }

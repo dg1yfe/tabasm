@@ -28,24 +28,16 @@ use std::io::Write;
 /// per-line diagnostics: the progress lines, the error count, and the fatal
 /// reports.
 ///
-/// The corpus in tests/golden/ was produced by a program called `tasm` and
-/// pins these lines byte-for-byte inside the compared output. This binary is
-/// called `tabasm`, so the prefix follows the binary by default and
-/// --report-compatibility restores the old spelling for comparison.
+/// It is `--message-prefix`, defaulting to the program's own name. TASM wrote
+/// `tasm:` here, so reproducing its output byte-for-byte is a matter of passing
+/// `--message-prefix tasm` rather than of a hidden mode.
 ///
-/// Note this covers stderr as well as stdout: the golden .err files for
-/// errfmt-mismatch and errfmt-percent-n contain
-///     tasm: ignoring TASMERRFORMAT: unsupported conversion ...
-/// and are compared byte-for-byte, despite the harness's comment claiming
-/// every .err is empty.
+/// This covers stderr as well as stdout: the TASMERRFORMAT rejection warning is
+/// prefixed too, and is compared.
 ///
 /// Every such message must route through here rather than embedding a literal.
-pub fn prog(o: &Options) -> &'static str {
-    if o.report_compatibility {
-        "tasm"
-    } else {
-        "tabasm"
-    }
+pub fn prog(o: &Options) -> &str {
+    &o.message_prefix
 }
 
 /// The acceptance criteria: the two-line identification banner is the one
@@ -95,8 +87,9 @@ fn main() {
     }
 
     // 1.5: failure to open the table is fatal, exit 3.
-    let table = match o.table_path(std::env::var("TASMTABS").ok().as_deref()) {
-        Some(path) => match table::Table::load(&path, o.table.as_deref().unwrap_or("")) {
+    let paths = o.table_paths(std::env::var("TASMTABS").ok().as_deref());
+    let table = match paths.first().cloned() {
+        Some(path) => match table::Table::load_first(&paths, o.table.as_deref().unwrap_or("")) {
             Ok(t) => t,
             Err(table::LoadError::Open(p)) => {
                 let _ = writeln!(out, "{}: cannot open table file {}", prog(&o), p);
@@ -151,8 +144,8 @@ fn main() {
     let exp_name = o.out_name(3, ".exp", &base);
     let sym_name = o.out_name(4, ".sym", &base);
 
-    let p = prog(&o);
-    let mut a = asm::Asm::new(o, table, fmt, p);
+    let p = o.message_prefix.clone();
+    let mut a = asm::Asm::new(o, table, fmt);
     if let Err(code) = a.run(&source) {
         let _ = write!(out, "{}", a.stdout);
         let _ = writeln!(out, "{}: file access failure", p);

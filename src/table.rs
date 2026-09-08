@@ -177,28 +177,28 @@ impl Table {
         }
     }
 
-    /// Load a table, choosing the format.
+    /// Load the first of `paths` that exists.
     ///
-    /// A v2 file is preferred when one exists: `tasm<nn>.tab2` is tried before
-    /// the `tasm<nn>.tab` of §1.5. Whichever file is opened is then sniffed, so
-    /// a v2 table under any name still parses as v2 -- the format is a property
-    /// of the content, not of the extension.
-    pub fn load(path: &str, selector: &str) -> Result<Table, LoadError> {
-        let v2_path = format!("{}2", path);
-        let (path, text) = match std::fs::read(&v2_path) {
-            Ok(t) => (v2_path, t),
-            Err(_) => (
-                path.to_string(),
-                std::fs::read(path).map_err(|_| LoadError::Open(path.to_string()))?,
-            ),
-        };
-        // Tables are data from outside; do not assume they are valid UTF-8.
-        let text = String::from_utf8_lossy(&text).into_owned();
-        if is_v2(&text) {
-            return crate::table2::parse(&text, selector);
+    /// The format is decided by the file's *content*, not its name: a table whose
+    /// first substantive line is `%format` parses as v2 whatever it is called.
+    pub fn load_first(paths: &[String], selector: &str) -> Result<Table, LoadError> {
+        for path in paths {
+            if let Ok(bytes) = std::fs::read(path) {
+                // Tables are data from outside; do not assume valid UTF-8.
+                let text = String::from_utf8_lossy(&bytes).into_owned();
+                return if is_v2(&text) {
+                    crate::table2::parse(&text, selector)
+                } else {
+                    Self::load_v1(&text, selector)
+                };
+            }
         }
-        let _ = path;
-        Self::load_v1(&text, selector)
+        Err(LoadError::Open(paths.first().cloned().unwrap_or_default()))
+    }
+
+    /// Convenience for a single known path, used by the tests.
+    pub fn load(path: &str, selector: &str) -> Result<Table, LoadError> {
+        Self::load_first(&[path.to_string()], selector)
     }
 
     /// True when the first line that is neither blank nor a `;` comment opens

@@ -43,7 +43,13 @@ pub struct Options {
     pub timing: bool,      // -y, lower case only (1.3)
     pub debug: bool,       // -z, trace to stderr
     pub compatibility: bool,      // --compatibility (1.3, 3.1, 4.7)
-    pub report_compatibility: bool, // --report-compatibility (see main::prog)
+    /// --message-prefix: the name on the assembler's own messages. TASM wrote
+    /// `tasm:`; reproducing that byte-for-byte is a compatibility concern, so it
+    /// is a value rather than a hidden behaviour.
+    pub message_prefix: String,
+    /// --page-title: the paged-listing heading used when the source sets no
+    /// `.TITLE`.
+    pub page_title: String,
     /// --bug-compatibility: reproduce the original's defects rather than the
     /// corrected behaviour -- the early-stopping symbol sort (2.1) and the
     /// word-address checksum (8.7). Distinct from --compatibility, which
@@ -76,7 +82,8 @@ impl Default for Options {
             timing: false,
             debug: false,
             compatibility: false,
-            report_compatibility: false,
+            message_prefix: "tabasm".to_string(),
+            page_title: "tabasm".to_string(),
             bug_compatibility: false,
             files: Vec::new(),
         }
@@ -146,9 +153,19 @@ impl Options {
         // original's: it keeps the "tasm:" message prefix while the binary is
         // named tabasm, so the golden corpus stays byte-comparable.
         if let Some(name) = body.strip_prefix('-') {
+            // The long options that take a value do so as `--name=value`; the
+            // caller also accepts `--name value` by pre-joining them.
+            if let Some((key, value)) = name.split_once('=') {
+                match key {
+                    "cpu" => self.table = Some(value.to_string()),
+                    "message-prefix" => self.message_prefix = value.to_string(),
+                    "page-title" => self.page_title = value.to_string(),
+                    _ => warnings.push(format!("unrecognized option: --{}", key)),
+                }
+                return;
+            }
             match name {
                 "compatibility" => self.compatibility = true,
-                "report-compatibility" => self.report_compatibility = true,
                 "bug-compatibility" => self.bug_compatibility = true,
                 _ => warnings.push(format!("unrecognized option: --{}", name)),
             }
@@ -262,15 +279,73 @@ impl Options {
         }
     }
 
-    /// 1.5: TASMTABS names a single directory, not a search path, and is
-    /// joined with a literal '/' on every platform. With it unset the bare
-    /// name resolves against the working directory.
-    pub fn table_path(&self, tasmtabs: Option<&str>) -> Option<String> {
-        let sel = self.table.as_ref()?;
-        let name = format!("tasm{}.tab", sel);
-        Some(match tasmtabs {
-            Some(dir) => format!("{}/{}", dir, name),
-            None => name,
-        })
+    /// Where to look for the selected table, in order.
+    ///
+    /// `<name>.tab2` is the current format, named exactly as `--cpu` selects it;
+    /// `tasm<name>.tab` is the legacy layout, still read so existing tables keep
+    /// working. TASMTABS names a single directory, not a search path, and is
+    /// joined with a literal '/' on every platform; with it unset the bare names
+    /// resolve against the working directory.
+    pub fn table_paths(&self, tasmtabs: Option<&str>) -> Vec<String> {
+        let sel = match self.table.as_ref() {
+            Some(s) => s,
+            None => return Vec::new(),
+        };
+        [format!("{}.tab2", sel), format!("tasm{}.tab", sel)]
+            .into_iter()
+            .map(|name| match tasmtabs {
+                Some(dir) => format!("{}/{}", dir, name),
+                None => name,
+            })
+            .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn opts(args: &[&str]) -> Options {
+        Options::parse(&args.iter().map(|s| s.to_string()).collect::<Vec<_>>(), None).opts
+    }
+
+    #[test]
+    fn cpu_selects_the_table_and_accepts_alphanumeric_names() {
+        assert_eq!(opts(&["--cpu=z80"]).table.as_deref(), Some("z80"));
+        assert_eq!(opts(&["--cpu=tms320c25"]).table.as_deref(), Some("tms320c25"));
+        assert_eq!(opts(&["--cpu=8051"]).table.as_deref(), Some("8051"));
+        // The legacy forms still work, undocumented, so one source tree serves
+        // both the published branch and the reference comparison.
+        assert_eq!(opts(&["-51"]).table.as_deref(), Some("51"));
+        assert_eq!(opts(&["-tz80"]).table.as_deref(), Some("z80"));
+    }
+
+    #[test]
+    fn candidate_table_paths_are_tried_current_format_first() {
+        let o = opts(&["--cpu=z80"]);
+        assert_eq!(o.table_paths(None), ["z80.tab2", "tasmz80.tab"]);
+        assert_eq!(
+            o.table_paths(Some("/t")),
+            ["/t/z80.tab2", "/t/tasmz80.tab"]
+        );
+        // 1.5: a single directory joined with a literal '/', not a search path.
+        assert!(opts(&[]).table_paths(Some("/t")).is_empty());
+    }
+
+    #[test]
+    fn the_identity_options_are_values_not_modes() {
+        assert_eq!(opts(&[]).message_prefix, "tabasm");
+        assert_eq!(opts(&[]).page_title, "tabasm");
+        let o = opts(&["--message-prefix=tasm", "--page-title=Some Vendor."]);
+        assert_eq!(o.message_prefix, "tasm");
+        assert_eq!(o.page_title, "Some Vendor.");
+    }
+
+    #[test]
+    fn the_two_compatibility_switches_are_independent() {
+        let o = opts(&["--compatibility"]);
+        assert!(o.compatibility && !o.bug_compatibility);
+        let o = opts(&["--bug-compatibility"]);
+        assert!(!o.compatibility && o.bug_compatibility);
     }
 }
