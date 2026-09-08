@@ -26,8 +26,12 @@ pub struct Enc {
     /// index form, which needs five argument bytes and so cannot fit a value.
     pub vector: Option<Vec<u8>>,
     pub diags: Vec<Diag>,
-    /// The literal -<nn> selector text. 7.20's arp_val compares against it.
-    pub selector: String,
+    /// The post-rule transform, per row rather than per table. See
+    /// `table::Row::post_shift`.
+    pub post_shift: u32,
+    pub post_or: u32,
+    /// How many auxiliary registers the target has (7.20's `arp_val`).
+    pub aux_registers: u32,
 }
 
 impl Enc {
@@ -70,7 +74,7 @@ impl Enc {
         (((v >> 8) & 0x00FF) | ((v << 8) & 0xFF00)) as i32
     }
 
-    pub fn apply(&mut self, rule: Rule, noargshift: bool) {
+    pub fn apply(&mut self, rule: Rule) {
         match rule {
             table::NO => {}
             table::JM => self.jm(),
@@ -86,11 +90,11 @@ impl Enc {
             table::CS => self.cs(),
             table::SW => self.sw(),
             table::R3REL => self.r3rel(),
-            table::T1 => { let s = self.selector.clone(); self.t1(&s) }
-            table::TD => { let s = self.selector.clone(); self.td(&s) }
+            table::T1 => self.t1(),
+            table::TD => self.td(),
             table::TL => self.tl(),
             table::T5 => self.t5(),
-            table::TA => { let s = self.selector.clone(); self.ta(&s) }
+            table::TA => self.ta(),
             table::SU => self.su(),
             table::R2 => self.r2(),
             table::I1 => self.i1(),
@@ -119,10 +123,11 @@ impl Enc {
             // 10.3: this is exactly what `Invalid MODOP.` is for.
             _ => self.err(msg::INVALID_MODOP),
         }
-        // 5.5: the default shift/OR step, unless the table opted out.
-        if !noargshift {
-            self.argval = ((self.argval as u32) << (self.shift & 31) | self.or) as i32;
-        }
+        // 5.5: the post-rule transform. v1 states it once per table (the absence
+        // of `.NOARGSHIFT`) and the loader resolves it onto each row; v2 writes
+        // it per row. Zero/zero is the identity.
+        self.argval =
+            ((self.argval as u32) << (self.post_shift & 31) | self.post_or) as i32;
     }
 
     // --- 7.4 JM: jump within a 2K page -------------------------------------
@@ -334,15 +339,14 @@ impl Enc {
     /// `arp_val`: the auxiliary-register number, whose width depends on the
     /// SELECTED TABLE rather than on the table's contents.
     ///
-    /// 7.20: the comparison is against the literal text of the -<nn> selector.
-    /// This is the only place in the assembler where behaviour depends on
-    /// which table was NAMED -- copying tasm3225.tab to tasm9999.tab and
-    /// assembling `LAR 5,10` is clean under -3225 and out of range under
-    /// -9999, with identical table bytes. It cannot be derived from the .tab
-    /// file, so it is special-cased on the selector.
-    fn arp_val(&mut self, i: usize, selector: &str) -> u32 {
+    /// 7.20 describes this as a comparison against the literal `-<nn>` selector
+    /// text -- the one place the original's behaviour depends on which table was
+    /// NAMED rather than on its contents. The width is now a property of the
+    /// table (`aux_registers`), derived from the selector for a v1 table and
+    /// stated outright by a v2 one, so no processor name reaches this code.
+    fn arp_val(&mut self, i: usize) -> u32 {
         let value = (self.arg(i) as u32) & 0xFFFF;
-        let result = if selector == "3225" { value & 7 } else { value & 1 };
+        let result = value & (self.aux_registers.saturating_sub(1));
         if result != value {
             let detail = self.argt.get(i).cloned();
             self.diags.push(Diag { msg: msg::RANGE_ARP, detail });
@@ -371,21 +375,20 @@ impl Enc {
 
     // --- 7.22 TMS320 --------------------------------------------------------
 
-    fn t1(&mut self, sel: &str) {
+    fn t1(&mut self) {
         let arg0 = self.shift_and(0, self.shift, self.or);
-        let arp = if self.argv.len() > 1 { self.arp_val(1, sel) } else { 0 };
+        let arp = if self.argv.len() > 1 { self.arp_val(1) } else { 0 };
         self.opcode |= arp | arg0;
         self.argval = 0;
     }
 
-    fn td(&mut self, sel: &str) {
+    fn td(&mut self) {
         let dma = self.shift_and(0, 0, 0x7F); // 7-bit direct address, no shift
         let arg1 = if self.argv.len() > 1 {
             self.shift_and(1, self.shift, self.or)
         } else {
             0
         };
-        let _ = sel;
         self.opcode |= dma | arg1;
         self.argval = 0;
     }
@@ -406,10 +409,10 @@ impl Enc {
         self.opcode |= arg0;
     }
 
-    fn ta(&mut self, sel: &str) {
+    fn ta(&mut self) {
         // The register number lands at bit 8 -- the opcode's HIGH byte --
         // where T1 places it at bit 0.
-        let arp = self.arp_val(0, sel) << 8;
+        let arp = self.arp_val(0) << 8;
         let arg1 = if self.argv.len() > 1 {
             self.shift_and(1, self.shift, self.or)
         } else {

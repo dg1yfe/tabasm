@@ -115,17 +115,25 @@ reimplementation must special-case a processor name.
 
 ## 3. The format
 
-Directives begin with `%`, comments with `#`, and a row is anything else. Both
+Directives begin with `%`, comments with `;`, and a row is anything else. Both
 are unambiguous because they are declared rather than inferred from the first
 character.
 
+**The comment leader is `;`, not `#`.** `#` is the immediate-addressing prefix in
+162 operand patterns across the shipped tables, so using it would truncate
+`ADD A,#<expr>` to `ADD` — the same class of mistake v1 makes with `/*`. Of the
+characters that never appear in any operand pattern, `;` is the one an assembly
+programmer expects. (`<` is likewise absent from every pattern, which is what
+makes `<expr>` and `<reg>` safe as placeholders; `>` does appear, twelve times,
+and stays a literal.)
+
 ```
-# tasm51.tab2 — Intel 8051
+; tasm51.tab2 — Intel 8051
 %format         2
 %banner         "TASM 8051 Assembler.    "
-%opcode-order   ls-first          # was .LSFIRST / .MSFIRST
-%address-unit   byte              # was .WORDADDRS (unit=word)
-%class          1 base            # CLASS bits get names
+%opcode-order   ls-first          ; was .LSFIRST / .MSFIRST
+%address-unit   byte              ; was .WORDADDRS (unit=word)
+%class          1 base            ; CLASS bits get names
 %columns        mnemonic operands opcode op-bytes arg-bytes rule
 
 ACALL   <expr>              11    1 1  jmp-page-2k  page-mask=F800
@@ -145,17 +153,23 @@ pattern is a literal, so `.ALTWILD` disappears entirely — `*` is just a charac
 now, which is what the TMS320 tables needed it to be:
 
 ```
-# tasm3225.tab2 — TMS320C25
+; tasm3225.tab2 — TMS320C25
 %opcode-order   ms-first
 %address-unit   word
-%aux-registers  8                 # §1.7: no longer a special case in the program
+%aux-registers  8                 ; §1.7: no longer a special case in the program
 %regset         "*BR0+" mask=F0 class=1
 %regset         "*0+"   mask=E0 class=1
 
-ADD     <reg>,<expr>,<expr>  0000  2 0  tms-fold  shift=0 invert=yes valid-mask=0F00
+ADD     <reg>,<expr>,<expr>  0088  2 0  tms-fold  shift=8 valid-mask=0F00
 ADD     <expr>               0000  2 0  tms-fold  valid-mask=007F
-ADD     *BR0+,<expr>         ...
+LAR     <expr>,<reg>,<expr>  3088  2 0  tms-aux   valid-mask=07
 ```
+
+The `8` in v1's `SHIFT` column here is a shift **count**, so it becomes
+`shift=8`. §7.20's invert flag lives in that column's **high** nibble, and no
+shipped table sets it: the five distinct `SHIFT` values in the whole corpus are
+`0`, `00`, `01`, `8` and `0C`, every one with a zero high nibble. `invert=yes`
+exists in v2 for completeness and is exercised by nothing.
 
 `%regset` order stops being load-bearing: the loader matches the **longest**
 name, not the first declared.
@@ -175,7 +189,8 @@ applies, so the tasm80/tasm3210 collision of §1.5 cannot recur:
 | `OR` as an agreement mask (`JM`) | `page-mask=` |
 | `OR` as a validity mask | `valid-mask=` |
 | `OR` as a per-field validity mask | `field-mask=` |
-| `SHIFT` high nibble as invert flag | `invert=yes` |
+| `SHIFT` low nibble as a shift count | `shift=` |
+| `SHIFT` high nibble as invert flag (unexercised) | `invert=yes` |
 | `SHIFT` as auto-increment OR (`I1`) | `set-bits=` |
 | `SHIFT` as opcode XOR (`I2`) | `opcode-xor=` |
 

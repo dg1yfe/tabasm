@@ -594,9 +594,11 @@ impl Asm {
             argt,
             vector: None,
             diags: Vec::new(),
-            selector: self.table.selector.clone(),
+            post_shift: row.post_shift,
+            post_or: row.post_or,
+            aux_registers: self.table.aux_registers,
         };
-        e.apply(row.rule, self.table.noargshift);
+        e.apply(row.rule);
         let diags = std::mem::take(&mut e.diags);
         for d in diags {
             self.diag(d.msg, d.detail);

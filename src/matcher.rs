@@ -112,7 +112,7 @@ fn walk(
             continue;
         }
 
-        if c == b'!' {
+        if c == table.regmark {
             // 6.4: scan the register table IN ORDER for an entry whose name is
             // a prefix of the remaining operand text. Declaration order is
             // load-bearing, because `*BR0+` must be tried before `*0+`.

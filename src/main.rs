@@ -15,6 +15,7 @@ mod object;
 mod rules;
 mod symbols;
 mod table;
+mod table2;
 mod limits;
 mod listing;
 mod macros;
@@ -106,6 +107,14 @@ fn main() {
                 let _ = writeln!(out, "{}: Max number of instructions exceeded", prog(&o));
                 let _ = out.flush();
                 std::process::exit(EXIT_FATAL);
+            }
+            Err(table::LoadError::Syntax(line, what)) => {
+                // A v2 table that does not parse. 1.5 makes a table that cannot
+                // be opened fatal with exit 3; one that cannot be understood is
+                // the same class of failure, and now says where.
+                let _ = writeln!(out, "{}: {} line {}: {}", prog(&o), path, line, what);
+                let _ = out.flush();
+                std::process::exit(EXIT_FILE);
             }
             Err(table::LoadError::TooManyRegsets) => {
                 let _ = writeln!(out, "{}: Max number of registers exceeded", prog(&o));

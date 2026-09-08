@@ -80,6 +80,16 @@ pub struct Row {
     pub class: u32,
     pub shift: u32,
     pub or: u32,
+    /// The post-rule transform `argval = (argval << post_shift) | post_or`.
+    ///
+    /// v1 states this once per table -- the absence of `.NOARGSHIFT` -- which is
+    /// why the same `OR` column is a value in tasm80.tab and a mask in
+    /// tasm3210.tab. Holding it per row removes that ambiguity and is what the
+    /// v2 format writes directly. For a v1 table both fields are `shift`/`or`
+    /// when the step applies and zero when it does not; `(x << 0) | 0` is the
+    /// identity, so either case reproduces exactly.
+    pub post_shift: u32,
+    pub post_or: u32,
     /// Set when NBYTES was smaller than the opcode, which 5.4 requires be
     /// diagnosed and the argument count forced to zero.
     pub short_count: bool,
@@ -100,14 +110,26 @@ pub struct Table {
     pub regsets: Vec<RegSet>,
     pub msfirst: bool,    // opcode byte order (distinct from the SOURCE .MSFIRST)
     pub wordaddrs: bool,  // one address unit is two bytes
-    pub noargshift: bool, // suppress the default (argval << SHIFT) | OR step
+    pub noargshift: bool, // v1 metadata; the step itself now lives on the Row
     pub wildcard: char,
+    /// The character an `ARGS` pattern uses for a register-set slot. v1 spells
+    /// it `!`; v2 uses a sentinel that cannot occur in source operand text.
+    pub regmark: u8,
+    /// How many auxiliary registers the target has, for 7.20's `arp_val`.
+    ///
+    /// v1 cannot state this: the original decides it by string-comparing the
+    /// `-<nn>` selector against "3225", the one place behaviour depends on
+    /// which table was NAMED. Derived from the selector when loading v1, read
+    /// from `%aux-registers` in v2.
+    pub aux_registers: u32,
 }
 
 pub enum LoadError {
     Open(String),
     TooManyRows,
     TooManyRegsets,
+    /// A v2 table that does not parse: line number and what was wrong.
+    Syntax(usize, String),
 }
 
 /// All-hex-digits, and not empty. Used to tell a real SHIFT/OR column from
@@ -149,13 +171,40 @@ impl Table {
             wordaddrs: false,
             noargshift: false,
             wildcard: '*',
+            regmark: b'!',
+            // 7.20: three bits for the C25, one for everything else.
+            aux_registers: if selector == "3225" { 8 } else { 2 },
         }
     }
 
+    /// Load a table, choosing the format.
+    ///
+    /// A v2 file is preferred when one exists: `tasm<nn>.tab2` is tried before
+    /// the `tasm<nn>.tab` of §1.5. Whichever file is opened is then sniffed, so
+    /// a v2 table under any name still parses as v2 -- the format is a property
+    /// of the content, not of the extension.
     pub fn load(path: &str, selector: &str) -> Result<Table, LoadError> {
-        let text = std::fs::read(path).map_err(|_| LoadError::Open(path.to_string()))?;
+        let v2_path = format!("{}2", path);
+        let (path, text) = match std::fs::read(&v2_path) {
+            Ok(t) => (v2_path, t),
+            Err(_) => (
+                path.to_string(),
+                std::fs::read(path).map_err(|_| LoadError::Open(path.to_string()))?,
+            ),
+        };
         // Tables are data from outside; do not assume they are valid UTF-8.
         let text = String::from_utf8_lossy(&text).into_owned();
+        if is_v2(&text) {
+            return crate::table2::parse(&text, selector);
+        }
+        let _ = path;
+        Self::load_v1(&text, selector)
+    }
+
+    /// True when the first line that is neither blank nor a `;` comment opens
+    /// with `%format`.
+
+    fn load_v1(text: &str, selector: &str) -> Result<Table, LoadError> {
         let mut t = Table::new(selector);
 
         for (n, raw) in text.lines().enumerate() {
@@ -179,6 +228,13 @@ impl Table {
         }
         if t.regsets.len() > MAX_REGSETS {
             return Err(LoadError::TooManyRegsets);
+        }
+        // Resolve the table-level default step onto the rows (see Row::post_*).
+        if !t.noargshift {
+            for r in &mut t.rows {
+                r.post_shift = r.shift;
+                r.post_or = r.or;
+            }
         }
         Ok(t)
     }
@@ -232,6 +288,17 @@ fn banner_text(line: &str) -> String {
 /// Parse one instruction row. Shared with `.ADDINSTR`, which takes the same
 /// syntax from a source file (4.11) -- so this is reachable from hostile input
 /// and must not panic or allocate unboundedly.
+pub fn is_v2(text: &str) -> bool {
+    for raw in text.lines() {
+        let l = raw.trim();
+        if l.is_empty() || l.starts_with(';') {
+            continue;
+        }
+        return l.starts_with("%format");
+    }
+    false
+}
+
 pub fn parse_row(line: &str) -> Option<Row> {
     let f: Vec<&str> = line.split_whitespace().collect();
     if f.len() < 6 {
@@ -274,6 +341,10 @@ pub fn parse_row(line: &str) -> Option<Row> {
         class: hex_val(f[5]),
         shift,
         or,
+        // Filled in by the caller once the table's directives are known; a row
+        // added by `.ADDINSTR` inherits nothing and so takes the identity.
+        post_shift: 0,
+        post_or: 0,
         short_count,
     })
 }
