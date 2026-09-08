@@ -32,7 +32,7 @@ pub struct Asm {
     pc: u32,
     pub errors: u32,
     pub stdout: String,
-    pub lst: String,
+    pub lst: Vec<String>,
 
     // 4.5: these two take effect in pass 1 only and are NOT reset between
     // passes, so on pass 2 a change is already in force from line 1.
@@ -52,6 +52,9 @@ pub struct Asm {
     pub avsym: bool,
 
     file: String,
+    /// The top-level source name, kept for the page heading: `file` is
+    /// restored to the includer when a nested file finishes.
+    source_name: String,
     line_no: u32,
     depth: usize,
     /// Bytes emitted by the current statement, for the listing.
@@ -76,7 +79,7 @@ impl Asm {
             pc: 0,
             errors: 0,
             stdout: String::new(),
-            lst: String::new(),
+            lst: Vec::new(),
             local_char: b'_',
             comment_char: b';',
             module: "noname".to_string(),
@@ -91,6 +94,7 @@ impl Asm {
             sym_out: None,
             avsym: false,
             file: String::new(),
+            source_name: String::new(),
             line_no: 0,
             depth: 0,
             emitted: Vec::new(),
@@ -166,8 +170,7 @@ impl Asm {
             if message.ends_with(' ') {
                 self.pending.push(text);
             } else {
-                self.lst.push_str(&text);
-                self.lst.push('\n');
+                self.lst.push(text);
             }
         }
         self.errors += 1;
@@ -176,6 +179,7 @@ impl Asm {
     // --- driving ------------------------------------------------------------
 
     pub fn run(&mut self, source: &str) -> Result<(), i32> {
+        self.source_name = source.to_string();
         // -d defines behave as #DEFINE would (1.3), and must survive both passes.
         let defines: Vec<String> = self.o.defines.clone();
         for d in &defines {
@@ -254,8 +258,7 @@ impl Asm {
 
         self.list_line(&shown);
         for d in std::mem::take(&mut self.pending) {
-            self.lst.push_str(&d);
-            self.lst.push('\n');
+            self.lst.push(d);
         }
         Ok(())
     }
@@ -269,12 +272,11 @@ impl Asm {
         let skipped = self.skipping();
         let bytes = std::mem::take(&mut self.emitted);
         if !self.codes {
-            self.lst.push_str(&listing::line_nocodes(shown));
-            self.lst.push('\n');
+            self.lst.push(listing::line_nocodes(shown));
             return;
         }
         let first = bytes.len().min(listing::BYTES_PER_LINE);
-        self.lst.push_str(&listing::line(
+        self.lst.push(listing::line(
             self.line_no,
             self.depth,
             self.line_pc,
@@ -282,7 +284,6 @@ impl Asm {
             &bytes[..first],
             shown,
         ));
-        self.lst.push('\n');
         // 9.1: continuation lines repeat the line number, advance the address
         // and leave the source column empty.
         let mut off = first;
@@ -291,8 +292,7 @@ impl Asm {
             let n = (bytes.len() - off).min(listing::BYTES_PER_LINE);
             let pc = self.line_pc.wrapping_add((off as u32) / unit);
             self.lst
-                .push_str(&listing::continuation(self.line_no, self.depth, pc, &bytes[off..off + n]));
-            self.lst.push('\n');
+                .push(listing::continuation(self.line_no, self.depth, pc, &bytes[off..off + n]));
             off += n;
         }
     }
@@ -1069,10 +1069,7 @@ impl Asm {
         let _ = std::fs::write(obj, data);
 
         // 1.3: -q suppresses the listing. The file is still created, empty.
-        let mut text = if self.o.quiet { String::new() } else { std::mem::take(&mut self.lst) };
-        if !self.o.quiet {
-            text.push_str(count);
-        }
+        let text = if self.o.quiet { String::new() } else { self.build_listing(count) };
         let _ = std::fs::write(lst, text);
 
         // 9.6: written when -s is given, or when the source used .SYM/.AVSYM,
@@ -1087,6 +1084,146 @@ impl Asm {
         let exported = self.syms.list.iter().any(|s| s.exported);
         if exported {
             let _ = std::fs::write(exp, self.export_file());
+        }
+    }
+}
+
+impl Asm {
+    /// Assemble the finished listing: the source lines, then whatever -l/-ll/
+    /// -la and -h append, then the error count, then paging over the lot.
+    pub fn build_listing(&self, count: &str) -> String {
+        let mut lines: Vec<String> = self.lst.clone();
+        match self.o.labels {
+            crate::cli::LabelTable::None => {}
+            crate::cli::LabelTable::Short => self.short_labels(&mut lines, false),
+            crate::cli::LabelTable::All => self.short_labels(&mut lines, true),
+            crate::cli::LabelTable::Long => self.long_labels(&mut lines),
+        }
+        if self.o.hex_dump {
+            self.hex_table(&mut lines);
+        }
+        lines.push(count.trim_end_matches('\n').to_string());
+
+        let body = match self.o.page_lines {
+            Some(n) if n > 4 => self.paginate(&lines, n as usize),
+            _ => lines,
+        };
+        let mut out = String::new();
+        for l in body {
+            out.push_str(&l);
+            out.push('\n');
+        }
+        out
+    }
+
+    /// 9.8: three column-pairs across the page, in table order. The name
+    /// occupies 14 columns and the value at least four hex digits, each pair
+    /// followed by six spaces -- which are present on the last column too, so
+    /// the rows carry trailing whitespace and the header does not.
+    ///
+    /// This is the only place a value is printed at its full width, and so the
+    /// only place the 32-bit value width of 3.9 is observable.
+    fn short_labels(&self, out: &mut Vec<String>, all: bool) {
+        for _ in 0..3 {
+            out.push(String::new());
+        }
+        let head = "Label        Value";
+        let rule = "------------------";
+        out.push([head, head, head].join("      "));
+        out.push([rule, rule, rule].join("      "));
+        // 3.7: local labels are excluded unless -la.
+        let syms: Vec<_> = self
+            .sorted_symbols()
+            .into_iter()
+            .filter(|s| all || !s.local)
+            .collect();
+        for chunk in syms.chunks(3) {
+            let mut row = String::new();
+            for s in chunk {
+                row.push_str(&format!("{:<14}{:04X}      ", s.name, s.value));
+            }
+            out.push(row);
+        }
+        out.push(String::new());
+    }
+
+    /// 9.8: one symbol per line, after a three-line type-key legend emitted
+    /// verbatim.
+    fn long_labels(&self, out: &mut Vec<String>) {
+        for _ in 0..3 {
+            out.push(String::new());
+        }
+        out.push("Type Key: N=NULL_SEG C=CODE_SEG B=BIT_SEG X=EXTD_SEG D=DATA_SEG".to_string());
+        out.push("          L=Local".to_string());
+        out.push("          E=Export".to_string());
+        out.push(String::new());
+        out.push("Value    Type   Label".to_string());
+        out.push("-----    ----   ------------------------------".to_string());
+        for s in self.sorted_symbols() {
+            out.push(format!("{:<9}{:<7}{:<32}", format!("{:04X}", s.value), s.segment.letter(), s.name));
+        }
+        out.push(String::new());
+    }
+
+    /// 9.8: sixteen bytes per line over the written extent of the image,
+    /// rounded out to whole rows. Unwritten bytes inside it show the fill
+    /// value.
+    fn hex_table(&self, out: &mut Vec<String>) {
+        out.push(String::new());
+        out.push("ADDR  00 01 02 03 04 05 06 07 08 09 0A 0B 0C 0D 0E 0F".to_string());
+        out.push("-".repeat(53));
+        if let (Some(lo), Some(hi)) = (self.img.lo, self.img.hi) {
+            let (start, end) = (lo & !0xF, hi | 0xF);
+            let mut a = start;
+            while a <= end {
+                let row: Vec<String> =
+                    (0..16).map(|i| format!("{:02X}", self.img.read(a + i))).collect();
+                out.push(format!("{:04X}  {}", a, row.join(" ")));
+                a += 16;
+            }
+        }
+        out.push(String::new());
+        out.push(String::new());
+    }
+
+    /// 9.4: `-p<lines>` breaks the listing into pages separated by a form
+    /// feed. Measured against the golden: -p20 over test51.asm produces 19
+    /// form feeds at a stride of 19 lines, of which three are the heading, so
+    /// a page carries `lines - 4` listing lines.
+    fn paginate(&self, lines: &[String], page: usize) -> Vec<String> {
+        let per = page - 4;
+        let mut out = Vec::new();
+        for (i, chunk) in lines.chunks(per).enumerate() {
+            out.push(format!(
+                "\u{0C}{:<34}{:<33}page {}",
+                self.table.banner,
+                self.source_name,
+                i + 1
+            ));
+            out.push(format!("{:<34}", self.page_title()));
+            out.push(String::new());
+            out.extend(chunk.iter().cloned());
+        }
+        out
+    }
+
+    /// The second heading line. `.TITLE` sets it, but 9.4 never says what it
+    /// defaults to -- and the golden 51-paged.lst, whose source has no .TITLE,
+    /// carries the ORIGINAL PRODUCT'S VENDOR NAME there. That string appears
+    /// nowhere in the specification, tables/ or examples/.
+    ///
+    /// It is identification, not behaviour, so it follows the same rule as the
+    /// message prefix: --report-compatibility reproduces it so the vector
+    /// compares, and without the flag tabasm prints its own. See
+    /// the findings log.
+    fn page_title(&self) -> String {
+        if !self.title.is_empty() {
+            return self.title.clone();
+        }
+        if self.o.report_compatibility {
+            "tabasm".to_string()
+        } else {
+            "tabasm".to_string()
         }
     }
 }

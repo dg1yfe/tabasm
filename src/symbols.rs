@@ -110,9 +110,12 @@ impl Symbols {
             self.overflowed = true;
             return true;
         }
-        self.index.insert(k, self.list.len());
+        self.index.insert(k.clone(), self.list.len());
         self.list.push(Symbol {
-            name: name.to_string(),
+            // -i does not merely compare case-insensitively: the stored name
+            // is upper-cased, and that is what the symbol file and the label
+            // table print (golden 51-ignorecase.sym).
+            name: k,
             value,
             segment,
             local,
