@@ -44,9 +44,12 @@ pub struct Options {
     pub debug: bool,       // -z, trace to stderr
     pub compatibility: bool,      // --compatibility (1.3, 3.1, 4.7)
     pub report_compatibility: bool, // --report-compatibility (see main::prog)
-    /// --broken-sort-compatibility: reproduce the original's early-stopping
-    /// shaker sort for the symbol order instead of sorting properly.
-    pub broken_sort: bool,
+    /// --bug-compatibility: reproduce the original's defects rather than the
+    /// corrected behaviour -- the early-stopping symbol sort (2.1) and the
+    /// word-address checksum (8.7). Distinct from --compatibility, which
+    /// restores two *semantic* behaviours, and from --report-compatibility,
+    /// which restores identity strings.
+    pub bug_compatibility: bool,
     pub files: Vec<String>,
 }
 
@@ -74,7 +77,7 @@ impl Default for Options {
             debug: false,
             compatibility: false,
             report_compatibility: false,
-            broken_sort: false,
+            bug_compatibility: false,
             files: Vec::new(),
         }
     }
@@ -146,7 +149,7 @@ impl Options {
             match name {
                 "compatibility" => self.compatibility = true,
                 "report-compatibility" => self.report_compatibility = true,
-                "broken-sort-compatibility" => self.broken_sort = true,
+                "bug-compatibility" => self.bug_compatibility = true,
                 _ => warnings.push(format!("unrecognized option: --{}", name)),
             }
             return;

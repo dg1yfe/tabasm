@@ -1109,10 +1109,10 @@ impl Asm {
     /// -l/-ll label tables.
     ///
     /// By default this is a proper lexical sort, which is what a symbol list
-    /// is for. `--broken-sort-compatibility` instead reproduces the original's
+    /// is for. `--bug-compatibility` instead reproduces the original's
     /// ordering exactly; see `shaker_order`.
     pub fn sorted_symbols(&self) -> Vec<&crate::symbols::Symbol> {
-        if self.o.broken_sort {
+        if self.o.bug_compatibility {
             return self.shaker_order();
         }
         let mut v: Vec<&crate::symbols::Symbol> = self.syms.list.iter().collect();
@@ -1206,6 +1206,7 @@ impl Asm {
             &regions,
             self.o.bytes_per_record as usize,
             self.end_addr,
+            self.o.bug_compatibility,
         );
         let _ = std::fs::write(obj, data);
 

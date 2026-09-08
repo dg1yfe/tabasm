@@ -25,7 +25,13 @@ fn hex4(v: u32) -> String {
     format!("{:04X}", v & 0xFFFF)
 }
 
-pub fn write(format: ObjFormat, regions: &[Region], per: usize, end_addr: u32) -> Vec<u8> {
+pub fn write(
+    format: ObjFormat,
+    regions: &[Region],
+    per: usize,
+    end_addr: u32,
+    bug_compatibility: bool,
+) -> Vec<u8> {
     match format {
         ObjFormat::Binary => {
             let mut out = Vec::new();
@@ -34,8 +40,8 @@ pub fn write(format: ObjFormat, regions: &[Region], per: usize, end_addr: u32) -
             }
             out
         }
-        ObjFormat::IntelHex => intel(regions, per, false),
-        ObjFormat::IntelWord => intel(regions, per, true),
+        ObjFormat::IntelHex => intel(regions, per, false, bug_compatibility),
+        ObjFormat::IntelWord => intel(regions, per, true, bug_compatibility),
         ObjFormat::MosTech => mos(regions, per),
         ObjFormat::SRecord => srec(regions, per, end_addr),
     }
@@ -44,20 +50,24 @@ pub fn write(format: ObjFormat, regions: &[Region], per: usize, end_addr: u32) -
 /// 8.3 / 8.7. Intel HEX: `:LLAAAATT<data>CC`, type always 00, checksum the
 /// two's complement of the low byte of the sum.
 ///
-/// With `word` (the -g4 variant) the address field carries `pc >> 1` -- but
-/// the checksum is still computed from the BYTE address. 8.7 records this as a
-/// defect that must be reproduced: the two disagree whenever the address is
-/// non-zero, so the records fail validation in any conforming HEX loader, and
-/// the golden corpus pins them that way. Do not "fix" it.
-fn intel(regions: &[Region], per: usize, word: bool) -> Vec<u8> {
+/// With `word` (the -g4 variant) the address field carries `pc >> 1`.
+///
+/// The original computed the checksum from the BYTE address while printing the
+/// WORD address (8.7). The two disagree whenever the address is non-zero, so
+/// every record after the first fails validation in a conforming HEX loader --
+/// the files are simply invalid. The checksum is therefore computed from the
+/// address actually printed, and `--bug-compatibility` restores the defect for
+/// byte-equality with the original.
+fn intel(regions: &[Region], per: usize, word: bool, bug_compatibility: bool) -> Vec<u8> {
     let mut out = String::new();
     for r in regions {
         for (addr, data) in records(r, per) {
-            let sum: u32 = data.len() as u32
-                + ((addr >> 8) & 0xFF)
-                + (addr & 0xFF)
-                + data.iter().map(|b| *b as u32).sum::<u32>();
             let shown = if word { addr >> 1 } else { addr };
+            let summed = if bug_compatibility { addr } else { shown };
+            let sum: u32 = data.len() as u32
+                + ((summed >> 8) & 0xFF)
+                + (summed & 0xFF)
+                + data.iter().map(|b| *b as u32).sum::<u32>();
             out.push(':');
             out.push_str(&hex2(data.len() as u32));
             out.push_str(&hex4(shown));
@@ -149,7 +159,7 @@ mod tests {
 
     #[test]
     fn intel_hex_matches_the_corpus() {
-        let s = text(intel(&[tail()], 0x18, false));
+        let s = text(intel(&[tail()], 0x18, false, false));
         assert_eq!(s, ":0601680012621263125640\n:00000001FF\n");
     }
 
@@ -174,22 +184,44 @@ mod tests {
     }
 
     #[test]
-    fn word_addressing_prints_a_halved_address_with_the_byte_checksum() {
-        // 8.7, the defect that must be reproduced. Same data at byte address
-        // 0x18: -g0 prints 0018, -g4 prints 000C, and BOTH end in 33 because
-        // both computed the checksum from 0x18.
+    fn word_addressing_checksum_is_correct_by_default_and_defective_under_the_flag() {
+        // 8.7: the original printed the WORD address but computed the checksum
+        // from the BYTE address, so -g0 and -g4 emitted the same checksum for
+        // the same data at different printed addresses -- invalid records.
+        // Default now sums the printed address; --bug-compatibility restores
+        // the defect, which is what the corpus pins.
         let data: Vec<u8> = vec![
             0x36, 0x37, 0x34, 0x56, 0x35, 0x12, 0x01, 0x93, 0x58, 0x59, 0x5A, 0x5B,
             0x5C, 0x5D, 0x5E, 0x5F, 0x56, 0x57, 0x54, 0x56, 0x55, 0x12, 0xB0, 0x81,
         ];
         let r = Region { start: 0x18, bytes: data };
-        let g0 = text(intel(&[r.clone()], 0x18, false));
-        let g4 = text(intel(&[r], 0x18, true));
+        let cs = |s: &str| {
+            let l = s.lines().next().unwrap();
+            l[l.len() - 2..].to_string()
+        };
+        let g0 = text(intel(&[r.clone()], 0x18, false, false));
+        let bug = text(intel(&[r.clone()], 0x18, true, true));
+        let fixed = text(intel(&[r], 0x18, true, false));
+
         assert!(g0.starts_with(":18001800"), "{}", &g0[..12]);
-        assert!(g4.starts_with(":18000C00"), "{}", &g4[..12]);
-        let cs = |s: &str| s.lines().next().unwrap().chars().rev().take(2).collect::<String>();
-        assert_eq!(cs(&g0), cs(&g4), "both checksums come from the byte address");
-        assert!(g0.lines().next().unwrap().ends_with("33"));
+        assert!(bug.starts_with(":18000C00"), "{}", &bug[..12]);
+        assert!(fixed.starts_with(":18000C00"), "{}", &fixed[..12]);
+
+        // The defect: same checksum as -g0 despite a different printed address.
+        assert_eq!(cs(&bug), cs(&g0));
+        assert_eq!(cs(&bug), "33");
+        // Corrected: the checksum matches the address actually printed, which
+        // is 0x0C higher, so the sum is 0x0C lower.
+        assert_eq!(cs(&fixed), "3F");
+
+        // And a corrected record actually validates: the whole record,
+        // checksum included, sums to zero in the low byte.
+        let line = fixed.lines().next().unwrap();
+        let total: u32 = (1..line.len())
+            .step_by(2)
+            .map(|i| u32::from_str_radix(&line[i..i + 2], 16).unwrap())
+            .sum();
+        assert_eq!(total & 0xFF, 0, "a conforming loader must accept it");
     }
 
     #[test]
@@ -205,7 +237,7 @@ mod tests {
 
     #[test]
     fn binary_has_no_framing() {
-        let out = write(ObjFormat::Binary, &[tail()], 0x18, 0);
+        let out = write(ObjFormat::Binary, &[tail()], 0x18, 0, false);
         assert_eq!(out, vec![0x12, 0x62, 0x12, 0x63, 0x12, 0x56]);
     }
 
