@@ -1,0 +1,10 @@
+# Default: let git handle line endings normally.
+* text=auto
+
+# One case asserts that CRLF source assembles identically to LF. Normalising it
+# would silently void that case, and conformance.rs checks it has not happened.
+testing/cases/crlf-source.asm -text
+
+# Instruction tables and recorded output are fixtures: byte-for-byte or nothing.
+tables/*.tab2 -text
+testing/golden/** -text
