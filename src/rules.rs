@@ -791,12 +791,12 @@ mod tests {
             table::I3, table::I4, table::I5, table::I6, table::I7, table::I8,
         ];
         let mut seen = std::collections::BTreeSet::new();
-        for sel in ["05", "3210", "3225", "48", "51", "65", "68", "70", "80", "85", "96"] {
-            let t = Table::load(&format!("tables/tasm{}.tab", sel), sel).ok().unwrap();
+        for sel in ["6502", "6800", "6805", "8048", "8051", "8085", "8096", "tms32010", "tms320c25", "tms7000", "z80"] {
+            let t = Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap();
             for r in &t.rows {
                 assert!(
                     implemented.contains(&r.rule),
-                    "tasm{}.tab selects an unimplemented rule via {:?}",
+                    "{} selects an unimplemented rule via {:?}",
                     sel,
                     r.mnemonic
                 );

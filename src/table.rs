@@ -204,7 +204,7 @@ impl Table {
     /// True when the first line that is neither blank nor a `;` comment opens
     /// with `%format`.
 
-    fn load_v1(text: &str, selector: &str) -> Result<Table, LoadError> {
+    pub(crate) fn load_v1(text: &str, selector: &str) -> Result<Table, LoadError> {
         let mut t = Table::new(selector);
 
         for (n, raw) in text.lines().enumerate() {
@@ -353,112 +353,131 @@ pub fn parse_row(line: &str) -> Option<Row> {
 mod tests {
     use super::*;
 
-    /// Row counts measured directly from the shipped tables with the rule
-    /// 5.1 states: a row is a line whose first character is an upper-case
-    /// letter. If the loader disagrees with `grep -c '^[A-Z]'`, it is wrong.
-    const EXPECTED: &[(&str, usize)] = &[
-        ("05", 163), ("3210", 130), ("3225", 297), ("48", 229), ("51", 241),
-        ("65", 169), ("68", 298), ("70", 218), ("80", 530), ("85", 246),
-        ("96", 290),
-    ];
+    /// The legacy tables are not shipped, so these fixtures are written inline.
+    /// That also makes each test say exactly which property it is about, rather
+    /// than depending on a particular processor's file.
+    fn load(text: &str, selector: &str) -> Table {
+        Table::load_v1(text, selector).ok().unwrap()
+    }
 
-    fn load(sel: &str) -> Table {
-        match Table::load(&format!("tables/tasm{}.tab", sel), sel) {
-            Ok(t) => t,
-            Err(_) => panic!("could not load tasm{}.tab", sel),
-        }
+    const HEAD: &str = "\"TASM 8051 Assembler.    \"\n";
+
+    #[test]
+    fn a_row_is_a_line_starting_with_an_upper_case_letter() {
+        // There is no comment syntax: `/*` and `;` lines are skipped because
+        // they begin with neither an upper-case letter nor a '.', and an
+        // indented or lower-case row is skipped for the same reason.
+        let t = load(
+            &format!(
+                "{}/* a comment, by accident of the first character\n\
+                 ; so is this\n\
+                 NOP \"\" 00 1 NOP 1\n\
+                 \x20 ADD A,R0 28 1 NOP 1\n\
+                 add A,R1 29 1 NOP 1\n",
+                HEAD
+            ),
+            "51",
+        );
+        assert_eq!(t.rows.len(), 1, "only the column-1 upper-case row is a row");
+        assert_eq!(t.rows[0].mnemonic, "NOP");
     }
 
     #[test]
-    fn every_shipped_table_loads_with_the_expected_row_count() {
-        for (sel, n) in EXPECTED {
-            assert_eq!(load(sel).rows.len(), *n, "row count for tasm{}.tab", sel);
-        }
+    fn slash_star_in_an_operand_pattern_is_data() {
+        // `/` is the 8051 complement-bit operator and `*` the wildcard. Treating
+        // `/*` as a comment leader would delete this row.
+        let t = load(&format!("{}ANL  C,/*     b0 2 NOP 1\n", HEAD), "51");
+        assert_eq!(t.rows.len(), 1);
+        assert_eq!(t.rows[0].args, "C,/*");
+        assert_eq!(t.rows[0].opcode, 0xb0);
     }
 
     #[test]
-    fn table_directives_match_the_shipped_tables() {
-        assert!(load("51").noargshift);
-        assert!(!load("51").msfirst);
-        assert!(load("68").msfirst);
-        for sel in ["3210", "3225"] {
-            let t = load(sel);
-            assert!(t.msfirst && t.wordaddrs && t.noargshift, "tasm{}", sel);
-            assert_eq!(t.wildcard, '@', "bare .ALTWILD means '@'");
-        }
-        assert_eq!(load("70").wildcard, '+', ".ALTWILD+ in tasm70.tab");
-        assert_eq!(load("3225").regsets.len(), 7);
-        assert_eq!(load("3210").regsets.len(), 3);
-        // Declaration order is load-bearing: matching is by prefix, so the
-        // longer names must come first.
-        assert_eq!(load("3225").regsets[0].name, "*BR0+");
-        assert_eq!(load("3225").regsets[6].name, "*");
+    fn the_banner_keeps_the_padding_inside_its_quotes() {
+        assert_eq!(load(HEAD, "51").banner, "TASM 8051 Assembler.    ");
+        // No quote on line 1 means no banner, rather than a mis-read one.
+        assert_eq!(load("no quote here\n", "51").banner, "");
     }
 
     #[test]
-    fn banners_keep_their_padding() {
-        assert_eq!(load("51").banner, "TASM 8051 Assembler.    ");
-        assert_eq!(load("96").banner, "TASM 8096 Assembler.");
-        assert_eq!(load("68").banner, "TASM 6800-6811 Assembler");
-    }
-
-    #[test]
-    fn opcode_and_argument_byte_counts_are_derived() {
-        let t = load("51");
-        let find = |m: &str, a: &str| {
-            t.rows.iter().find(|r| r.mnemonic == m && r.args == a).unwrap().clone()
-        };
-        // ACALL *  11 2 JMP 1 0 F800
-        let acall = find("ACALL", "*");
+    fn opcode_width_comes_from_the_digit_count_and_arg_bytes_are_derived() {
+        let t = load(
+            &format!(
+                "{}ACALL *       11 2 JMP 1 0 F800\n\
+                 LCALL *       12 3 SWAP 1\n\
+                 BIT   *,(IX*) CBDD 4 ZBIT 1 0 4600\n",
+                HEAD
+            ),
+            "51",
+        );
+        let (acall, lcall, bit) = (&t.rows[0], &t.rows[1], &t.rows[2]);
         assert_eq!((acall.opcode, acall.opcode_bytes, acall.arg_bytes), (0x11, 1, 1));
         assert_eq!(acall.rule, JM);
         assert_eq!((acall.shift, acall.or), (0, 0xF800));
-        // LCALL *  12 3 SWAP 1  -- no SHIFT/OR columns at all
-        let lcall = find("LCALL", "*");
         assert_eq!((lcall.opcode_bytes, lcall.arg_bytes, lcall.rule), (1, 2, SW));
-        assert_eq!((lcall.shift, lcall.or), (0, 0));
+        // Four hex digits is two opcode bytes, so 4 - 2 = 2 argument bytes.
+        assert_eq!((bit.opcode_bytes, bit.arg_bytes), (2, 2));
+    }
+
+    #[test]
+    fn the_default_step_is_resolved_onto_each_row() {
+        // Without .NOARGSHIFT the table-level transform applies, so the row
+        // carries it; with it, the columns belong to the rule alone.
+        let with = load(&format!("{}BIT *,(IX*) CBDD 4 ZBIT 1 0 4600\n", HEAD), "80");
+        assert_eq!((with.rows[0].post_shift, with.rows[0].post_or), (0, 0x4600));
+        let without = load(
+            &format!("{}.NOARGSHIFT\nADD !,@,@ 0088 2 T1 1 8 0F00\n", HEAD),
+            "3225",
+        );
+        assert_eq!((without.rows[0].post_shift, without.rows[0].post_or), (0, 0));
+        assert_eq!((without.rows[0].shift, without.rows[0].or), (8, 0x0F00));
     }
 
     #[test]
     fn trailing_commentary_is_not_read_as_shift_or_or() {
-        // tasm48.tab: `EN   DMA    E5 1 NOP 2  ;8041` -- field 7 is commentary.
-        let t = load("48");
-        let en = t.rows.iter().find(|r| r.mnemonic == "EN" && r.args == "DMA").unwrap();
-        assert_eq!((en.class, en.shift, en.or), (2, 0, 0));
-        // tasm3225.tab: `ADDK @  CC00 2 T1 1 0 00FF   ;8 bit constant`
-        let t = load("3225");
-        let addk = t.rows.iter().find(|r| r.mnemonic == "ADDK").unwrap();
-        assert_eq!((addk.shift, addk.or), (0, 0x00FF));
+        // A seventh field is SHIFT only if it parses as hexadecimal; several
+        // legacy rows carry `;8041` there instead.
+        let t = load(&format!("{}EN   DMA    E5 1 NOP 2  ;8041\n", HEAD), "48");
+        assert_eq!((t.rows[0].class, t.rows[0].shift, t.rows[0].or), (2, 0, 0));
     }
 
     #[test]
-    fn slash_star_in_an_args_field_is_not_a_comment() {
-        // tasm51.tab: `ANL  C,/*  b0 2 NOP 1`. The '/' is the 8051
-        // complement-bit operator and '*' is the wildcard. Stripping /* as a
-        // comment would delete this row and ~400 others in tasm80.tab.
-        let t = load("51");
-        let anl = t.rows.iter().find(|r| r.mnemonic == "ANL" && r.args == "C,/*");
-        assert!(anl.is_some(), "ANL C,/* must survive the loader");
-        assert_eq!(anl.unwrap().opcode, 0xb0);
+    fn directives_are_read() {
+        let t = load(
+            &format!(
+                "{}.MSFIRST\n.ALTWILD\n.WORDADDRS\n.NOARGSHIFT\n\
+                 .REGSET *BR0+   F0 1\n.REGSET *0+     E0 1\n",
+                HEAD
+            ),
+            "3225",
+        );
+        assert!(t.msfirst && t.wordaddrs && t.noargshift);
+        assert_eq!(t.wildcard, '@', "a bare .ALTWILD means '@'");
+        assert_eq!(t.regsets.len(), 2);
+        assert_eq!(t.regsets[0].name, "*BR0+");
+        // The auxiliary-register width is not in the file; it comes from the
+        // selector, which is why the current format states it outright.
+        assert_eq!(t.aux_registers, 8);
+        assert_eq!(load(HEAD, "51").aux_registers, 2);
+        assert_eq!(load(&format!("{}.ALTWILD+\n", HEAD), "70").wildcard, '+');
     }
 
     #[test]
-    fn the_z80_im_alias_rows_are_present_and_repaired() {
-        // 7.19: the no-space spellings lacked the ARGS column, which shifted
-        // every later field. The shipped table carries them repaired, with an
-        // empty operand pattern, and z80-im-alias pins that.
-        let t = load("80");
-        for (m, op) in [("IM0", 0x46EDu32), ("IM1", 0x56ED), ("IM2", 0x5EED)] {
-            let r = t.rows.iter().find(|r| r.mnemonic == m).expect(m);
-            assert_eq!(r.args, "\"\"", "{} must take no operands", m);
-            assert_eq!((r.opcode, r.opcode_bytes, r.rule), (op, 2, NO));
-        }
+    fn the_no_operand_spelling_is_two_quotes() {
+        // The alias rows that once lacked this column could never match.
+        let t = load(
+            &format!("{}IM0  \"\"      46ED 2 NOP 1\nIM   0       46ED 2 NOP 1\n", HEAD),
+            "80",
+        );
+        assert_eq!(t.rows[0].args, "\"\"");
+        assert_eq!((t.rows[0].opcode, t.rows[0].opcode_bytes, t.rows[0].rule), (0x46ED, 2, NO));
+        assert_eq!(t.rows[1].args, "0");
     }
 
     #[test]
     fn a_byte_count_under_the_opcode_size_is_flagged_not_wrapped() {
-        // security.sh: `FOO *,* 12 FF ZW 1` -- "FF" is not decimal, so NBYTES
-        // reads 0 and the subtraction would underflow a byte to ~255.
+        // "FF" is not decimal, so the count reads 0 and the subtraction would
+        // underflow a byte to ~255.
         let r = parse_row("FOO *,* 12 FF ZW 1").unwrap();
         assert!(r.short_count);
         assert_eq!(r.arg_bytes, 0);
@@ -471,5 +490,14 @@ mod tests {
         let long = format!("NOP \"\" {} 1 NOP 1", "A".repeat(200));
         let r = parse_row(&long).unwrap();
         assert!(r.opcode_bytes <= 4, "a 200-digit opcode must be bounded");
+    }
+
+    #[test]
+    fn rule_names_are_keyed_on_two_characters() {
+        // Which is why COMBREL selects the combine rule, not CR.
+        assert_eq!(Rule::from_str("NOP"), Rule::from_str("NOTOUCH"));
+        assert_eq!(Rule::from_str("COMB"), Rule::from_str("COMBINE"));
+        assert_eq!(Rule::from_str("COMBREL"), CO);
+        assert_eq!(Rule::from_str("CREL"), CR);
     }
 }

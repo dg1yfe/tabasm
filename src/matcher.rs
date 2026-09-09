@@ -165,15 +165,15 @@ mod tests {
     use crate::table::{self, Table};
 
     fn load(sel: &str) -> Table {
-        Table::load(&format!("tables/tasm{}.tab", sel), sel).ok().unwrap()
+        Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap()
     }
 
     #[test]
     fn worked_example_from_6_6() {
-        let t = load("51");
+        let t = load("8051");
         let m = find(&t, "CJNE", "A,#25h,loop", 1).expect("CJNE must match");
         let row = &t.rows[m.row];
-        assert_eq!(row.args, "A,#*,*");
+        assert_eq!(crate::table2::display(&row.args), "A,#<expr>,<expr>");
         assert_eq!((m.opcode, row.opcode_bytes, row.arg_bytes), (0xB4, 1, 2));
         assert_eq!(row.rule, table::CR);
         // The capture keeps the source's own case: labels are case-sensitive.
@@ -185,21 +185,21 @@ mod tests {
         // 5.6: `ADD A,#*` precedes `ADD A,*`, so an immediate operand reaches
         // the immediate row. Nothing prefers a more specific pattern -- swap
         // the rows and `A,*` would capture "#5" instead.
-        let t = load("51");
+        let t = load("8051");
         let m = find(&t, "ADD", "A,#5", 1).unwrap();
-        assert_eq!(t.rows[m.row].args, "A,#*");
+        assert_eq!(crate::table2::display(&t.rows[m.row].args), "A,#<expr>");
         assert_eq!(m.args, vec!["5".to_string()]);
         let m = find(&t, "ADD", "A,25h", 1).unwrap();
-        assert_eq!(t.rows[m.row].args, "A,*");
+        assert_eq!(crate::table2::display(&t.rows[m.row].args), "A,<expr>");
     }
 
     #[test]
     fn empty_operand_pattern_requires_empty_operands() {
-        let t = load("51");
+        let t = load("8051");
         assert!(find(&t, "NOP", "", 1).is_some());
         assert!(find(&t, "NOP", "A", 1).is_none());
         // The repaired Z80 rows, which is what z80-im-alias pins.
-        let t = load("80");
+        let t = load("z80");
         for (m, op) in [("IM0", 0x46EDu32), ("IM1", 0x56ED), ("IM2", 0x5EED)] {
             assert_eq!(find(&t, m, "", 1).unwrap().opcode, op);
         }
@@ -211,30 +211,30 @@ mod tests {
 
     #[test]
     fn matching_is_case_insensitive_but_capture_is_not() {
-        let t = load("51");
+        let t = load("8051");
         let m = find(&t, "mov", "A,#MixedCase", 1).unwrap();
         assert_eq!(m.args, vec!["MixedCase".to_string()]);
     }
 
     #[test]
     fn whitespace_in_operands_is_removed_before_matching() {
-        let t = load("51");
+        let t = load("8051");
         assert!(find(&t, "CJNE", "A , # 25h , loop", 1).is_some());
     }
 
     #[test]
     fn class_mask_gates_rows() {
-        // tasm48.tab holds 8021/8022/8041 extensions on class bits 2, 4, 8.
-        let t = load("48");
+        // The 8048 table holds 8021/8022/8041 extensions on class bits 2, 4, 8.
+        let t = load("8048");
         assert!(find(&t, "EN", "DMA", 1).is_none(), "class 2 needs -x2");
         assert!(find(&t, "EN", "DMA", 2).is_some());
     }
 
     #[test]
     fn register_sets_match_by_prefix_in_declaration_order() {
-        // tasm3225.tab declares *BR0+ before *0+, because a prefix match would
-        // otherwise stop at the shorter name.
-        let t = load("3225");
+        // The C25 table declares *BR0+ and *0+; the longest name wins, so a
+        // prefix match cannot stop at the shorter one.
+        let t = load("tms320c25");
         let m = find(&t, "ADD", "*BR0+,4", 1);
         assert!(m.is_some(), "*BR0+ must match its own regset");
         let m = m.unwrap();
@@ -244,8 +244,8 @@ mod tests {
 
     #[test]
     fn a_slash_in_the_pattern_is_a_literal() {
-        // `ANL C,/*` -- '/' is the 8051 complement-bit operator.
-        let t = load("51");
+        // `ANL C,/<expr>` -- '/' is the 8051 complement-bit operator.
+        let t = load("8051");
         let m = find(&t, "ANL", "C,/40h", 1).expect("ANL C,/expr must match");
         assert_eq!(t.rows[m.row].opcode, 0xb0);
         assert_eq!(m.args, vec!["40h".to_string()]);
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn an_unknown_mnemonic_matches_nothing() {
-        let t = load("51");
+        let t = load("8051");
         assert!(find(&t, "FROBNICATE", "a,r0", 1).is_none());
         assert!(find(&t, "WIBBLE", "", 1).is_none());
     }

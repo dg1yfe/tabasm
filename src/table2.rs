@@ -474,7 +474,9 @@ pub fn render(t: &Table, banner: Option<&str>) -> String {
     for r in &t.rows {
         // v1 spells the wildcard per table and the register slot `!`.
         let mut pat = String::new();
-        if r.args == "\"\"" {
+        // Either spelling of "no operands": the legacy `""` or an already
+        // translated empty pattern.
+        if r.args.is_empty() || r.args == "\"\"" {
             pat.push('-');
         } else {
             for c in r.args.chars() {
@@ -552,16 +554,15 @@ pub fn name_for(rule: Rule) -> &'static str {
 mod tests {
     use super::*;
 
-    const TABLES: [&str; 11] =
-        ["05", "3210", "3225", "48", "51", "65", "68", "70", "80", "85", "96"];
+    const TABLES: [&str; 11] = ["6502", "6800", "6805", "8048", "8051", "8085", "8096", "tms32010", "tms320c25", "tms7000", "z80"];
 
-    /// The round trip: load each shipped v1 table, render it as v2, parse that
-    /// back, and require the two `Table` values to be equivalent. 2281 rows of
-    /// coverage with no new data checked in, and v1 as the control.
+    /// The round trip: load each shipped table, render it, parse the result, and
+    /// require the two `Table` values to be equivalent. Rendering and parsing
+    /// must be exact inverses over all 2811 rows.
     #[test]
     fn every_shipped_table_survives_a_round_trip_through_v2() {
         for sel in TABLES {
-            let v1 = Table::load(&format!("tables/tasm{}.tab", sel), sel).ok().unwrap();
+            let v1 = Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap();
             let text = render(&v1, None);
             let v2 = match parse(&text, sel) {
                 Ok(t) => t,
@@ -582,23 +583,7 @@ mod tests {
             assert_eq!(v1.rows.len(), v2.rows.len(), "tasm{} row count", sel);
 
             for (i, (a, b)) in v1.rows.iter().zip(&v2.rows).enumerate() {
-                // v1 spells the placeholders per table; normalise before comparing.
-                let want: String = if a.args == "\"\"" {
-                    String::new()
-                } else {
-                    a.args
-                        .chars()
-                        .map(|c| {
-                            if c == v1.wildcard {
-                                EXPR as char
-                            } else if c == v1.regmark as char {
-                                REG as char
-                            } else {
-                                c
-                            }
-                        })
-                        .collect()
-                };
+                let want = a.args.clone();
                 let where_ = format!("tasm{} row {} ({})", sel, i, a.mnemonic);
                 assert_eq!(a.mnemonic, b.mnemonic, "{}", where_);
                 assert_eq!(want, b.args, "{} operands", where_);
@@ -626,7 +611,7 @@ mod tests {
     #[test]
     fn no_shipped_row_carries_an_unreachable_shift_or_mask() {
         for sel in TABLES {
-            let t = Table::load(&format!("tables/tasm{}.tab", sel), sel).ok().unwrap();
+            let t = Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap();
             for r in &t.rows {
                 if params_for(r.rule).is_empty() && r.post_shift == 0 && r.post_or == 0 {
                     assert_eq!(
