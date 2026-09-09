@@ -448,7 +448,7 @@ mod tests {
     /// Join with the platform's separator: the paths are built with
     /// MAIN_SEPARATOR, which is a backslash on Windows.
     fn j(parts: &[&str]) -> String {
-        parts.join(&std::path::MAIN_SEPARATOR.to_string())
+        parts.join(std::path::MAIN_SEPARATOR_STR)
     }
 
     fn opts(args: &[&str]) -> Options {
