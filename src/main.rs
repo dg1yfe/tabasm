@@ -40,10 +40,14 @@ pub fn prog(o: &Options) -> &str {
     &o.message_prefix
 }
 
-/// The two-line identification banner is the one thing excluded when output is
-/// compared against the original's, precisely so that a clean-room
-/// reimplementation prints its own identification rather than inheriting
-/// someone else's. Keep it to two lines: the comparison skips exactly that many.
+/// The identification banner is the one thing excluded when output is compared
+/// against the original's, precisely so that this program prints its own
+/// identification rather than inheriting someone else's. One line: what it is
+/// and which version. How it came to be written is not something a person
+/// running it asked for, and it would be on every invocation.
+///
+/// The comparison skips exactly as many lines as this prints, so changing the
+/// count means changing the harness with it.
 ///
 /// This deliberately does NOT follow --report-compatibility. That flag exists
 /// to keep compared output byte-identical, and the banner is the one thing
@@ -54,10 +58,6 @@ fn banner(out: &mut dyn Write) {
         out,
         "tabasm {} -- table-driven cross-assembler.",
         env!("CARGO_PKG_VERSION")
-    );
-    let _ = writeln!(
-        out,
-        " Clean-room reimplementation from the TASM behavioural specification."
     );
 }
 

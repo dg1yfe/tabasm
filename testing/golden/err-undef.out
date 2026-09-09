@@ -1,5 +1,4 @@
 tabasm 2026.9.2 -- table-driven cross-assembler.
- Clean-room reimplementation from the TASM behavioural specification.
 tabasm: pass 1 complete.
 err-undef.asm line 0004: Label not found: (no_such_label)
 err-undef.asm line 0004: Unused data in MS byte of argument. (200)

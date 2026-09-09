@@ -1,5 +1,4 @@
 tabasm 2026.9.2 -- table-driven cross-assembler.
- Clean-room reimplementation from the TASM behavioural specification.
 
 usage: tabasm --cpu <name> [options] source [object [listing [export [symbol]]]]
 

@@ -1,5 +1,4 @@
 tabasm 2026.9.2 -- table-driven cross-assembler.
- Clean-room reimplementation from the TASM behavioural specification.
 tabasm: pass 1 complete.
 tms-arp-width.asm line 0034: Range of argument exceeded. (2)
 tms-arp-width.asm line 0041: Range of ARP argument exceeded. (5)
