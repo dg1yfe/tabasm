@@ -15,23 +15,27 @@ on:
     tags: ['v*']
   workflow_dispatch:
     inputs:
-      tag:
-        description: Existing tag to build (for a dry run)
+      ref:
+        description: 'Branch or tag to build. A manual run builds and packages only; it publishes nothing.'
         required: true
+        default: master
 
 permissions:
   contents: write
 
 env:
-  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+  TAG: ${{ github.event.inputs.ref || github.ref_name }}
 
 jobs:
+  # Only a tag push publishes anything. A manual run is a dry run: it builds
+  # and packages every target and checks the result, then stops.
   draft:
     name: open a draft release
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { ref: '${{ github.event.inputs.tag || github.ref_name }}' }
+        with: { ref: '${{ github.ref_name }}' }
 
       # The tag names the version, and so does Cargo.toml. If they disagree,
       # the download name and the banner the binary prints disagree, which is
@@ -57,6 +61,8 @@ jobs:
   build:
     name: ${{ matrix.name }}
     needs: draft
+    # Run even when the draft job was skipped, which is what a dry run does.
+    if: ${{ !cancelled() && (needs.draft.result == 'success' || needs.draft.result == 'skipped') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -79,7 +85,7 @@ jobs:
           - { os: windows-latest, name: x86_64-windows,  target: '',                             ext: zip,    qemu: '' }
     steps:
       - uses: actions/checkout@v4
-        with: { ref: '${{ github.event.inputs.tag || github.ref_name }}' }
+        with: { ref: '${{ github.event.inputs.ref || github.ref_name }}' }
       - run: rustup update --no-self-update stable && rustup default stable
 
       - name: Build
@@ -130,7 +136,7 @@ jobs:
       - name: Package
         shell: bash
         run: |
-          ver="${TAG#v}"
+          ver=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
           dir="tabasm-$ver-${{ matrix.name }}"
           mkdir -p "$dir"
           cp out/* "$dir"/
@@ -163,14 +169,28 @@ jobs:
           ls -l "$dir".*
 
       - name: Upload to the draft
+        if: github.event_name == 'push'
         shell: bash
         run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber tabasm-*.tar.gz tabasm-*.zip
         env:
           GH_TOKEN: ${{ github.token }}
 
+      # A dry run keeps the archives as workflow artifacts instead, so what
+      # was built can be downloaded and looked at.
+      - name: Keep the archive (dry run)
+        if: github.event_name != 'push'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: |
+            tabasm-*.tar.gz
+            tabasm-*.zip
+          if-no-files-found: error
+
   publish:
     name: checksums and publish
     needs: build
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
