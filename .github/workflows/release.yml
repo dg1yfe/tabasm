@@ -1,0 +1,159 @@
+# Build the release archives and attach them to a GitHub Release.
+#
+# Triggered by pushing a version tag. The tag carries a leading `v` so that
+# `v*` matches releases and nothing else: with a calendar version, a bare
+# numeric glob would also match any date-shaped tag.
+#
+# Only actions/checkout is used here, as in ci.yml. The upload is done with
+# the `gh` CLI, which is preinstalled on every runner and authenticates with
+# the token GitHub already provides, so the release path stays as free of
+# third-party dependencies as the crate is.
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Existing tag to build (for a dry run)
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  TAG: ${{ github.event.inputs.tag || github.ref_name }}
+
+jobs:
+  draft:
+    name: open a draft release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ github.event.inputs.tag || github.ref_name }}' }
+
+      # The tag names the version, and so does Cargo.toml. If they disagree,
+      # the download name and the banner the binary prints disagree, which is
+      # exactly the sort of drift nobody notices until someone reports a bug
+      # against the wrong version. Fail here instead.
+      - name: Tag and manifest must agree
+        run: |
+          manifest=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
+          if [ "${TAG#v}" != "$manifest" ]; then
+            echo "tag $TAG implies version ${TAG#v}, Cargo.toml says $manifest" >&2
+            exit 1
+          fi
+          echo "version $manifest"
+
+      - name: Create the draft
+        run: |
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && exit 0
+          gh release create "$TAG" --repo "$GITHUB_REPOSITORY" --draft \
+            --title "tabasm ${TAG#v}" --notes "See the tag annotation and README."
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    name: ${{ matrix.name }}
+    needs: draft
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # Statically linked against musl, so it runs on any Linux however
+          # old its glibc. Nothing here dlopens or looks up users, which is
+          # where static musl would otherwise bite.
+          - { os: ubuntu-latest,  name: x86_64-linux,    target: x86_64-unknown-linux-musl, ext: tar.gz }
+          - { os: macos-latest,   name: universal-macos, target: '',                        ext: tar.gz }
+          - { os: windows-latest, name: x86_64-windows,  target: '',                        ext: zip }
+    steps:
+      - uses: actions/checkout@v4
+        with: { ref: '${{ github.event.inputs.tag || github.ref_name }}' }
+      - run: rustup update --no-self-update stable && rustup default stable
+
+      - name: Build
+        shell: bash
+        run: |
+          if [ "${{ matrix.name }}" = universal-macos ]; then
+            # macos-latest is arm64; add the Intel target and fuse the two so
+            # one download serves both, which is what a Mac user expects.
+            rustup target add aarch64-apple-darwin x86_64-apple-darwin
+            cargo build --release --locked --target aarch64-apple-darwin
+            cargo build --release --locked --target x86_64-apple-darwin
+            mkdir -p out
+            for b in tabasm tab1to2; do
+              lipo -create -output "out/$b" \
+                "target/aarch64-apple-darwin/release/$b" \
+                "target/x86_64-apple-darwin/release/$b"
+              lipo -info "out/$b"
+            done
+          elif [ -n "${{ matrix.target }}" ]; then
+            sudo apt-get update && sudo apt-get install -y musl-tools
+            rustup target add ${{ matrix.target }}
+            cargo build --release --locked --target ${{ matrix.target }}
+            mkdir -p out && cp target/${{ matrix.target }}/release/tabasm out/
+            cp target/${{ matrix.target }}/release/tab1to2 out/
+            file out/tabasm
+          else
+            cargo build --release --locked
+            mkdir -p out && cp target/release/tabasm.exe target/release/tab1to2.exe out/
+          fi
+
+      # A release binary that has not been tested is a guess. The suites are
+      # fast; run them on what is about to ship.
+      - name: Test
+        run: cargo test --release --locked
+
+      - name: Package
+        shell: bash
+        run: |
+          ver="${TAG#v}"
+          dir="tabasm-$ver-${{ matrix.name }}"
+          mkdir -p "$dir"
+          cp out/* "$dir"/
+          # The tables are not optional extras: without them the binary knows
+          # no instruction set and cannot assemble anything at all.
+          cp -r tables "$dir"/
+          cp README.md LICENSE NOTICE "$dir"/
+          mkdir -p "$dir/doc" && cp doc/table-format.md doc/table-format-legacy.md "$dir/doc"/
+
+          # Prove the packaged binary works from inside the package, rather
+          # than trusting that the copy went right.
+          printf '        .org 0\n        nop\n        .end\n' > "$dir/probe.asm"
+          ( cd "$dir" && TASMTABS=tables ./tabasm* --cpu z80 probe.asm probe.obj probe.lst )
+          rm -f "$dir"/probe.*
+
+          if [ "${{ matrix.ext }}" = zip ]; then
+            7z a -tzip "$dir.zip" "$dir" >/dev/null
+          else
+            tar czf "$dir.tar.gz" "$dir"
+          fi
+          ls -l "$dir".*
+
+      - name: Upload to the draft
+        shell: bash
+        run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber tabasm-*.tar.gz tabasm-*.zip
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  publish:
+    name: checksums and publish
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checksums over what was actually uploaded
+        run: |
+          mkdir dl && cd dl
+          gh release download "$TAG" --repo "$GITHUB_REPOSITORY" --pattern 'tabasm-*'
+          sha256sum tabasm-* > SHA256SUMS
+          cat SHA256SUMS
+          gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber SHA256SUMS
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - name: Publish
+        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+        env:
+          GH_TOKEN: ${{ github.token }}
