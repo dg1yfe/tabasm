@@ -1,0 +1,536 @@
+%format         2
+%banner         "Table-driven Z80 Assembler"
+%opcode-order   ls-first
+%address-unit   byte
+%aux-registers  2
+%columns        mnemonic operands opcode op-bytes arg-bytes rule
+ADC A,(HL) 8E 1 0 plain
+ADC A,(IX<expr>) 8EDD 2 1 index-z80
+ADC A,(IY<expr>) 8EFD 2 1 index-z80
+ADC A,A 8F 1 0 plain
+ADC A,B 88 1 0 plain
+ADC A,C 89 1 0 plain
+ADC A,D 8A 1 0 plain
+ADC A,E 8B 1 0 plain
+ADC A,H 8C 1 0 plain
+ADC A,L 8D 1 0 plain
+ADC A,<expr> CE 1 1 plain
+ADC HL,BC 4AED 2 0 plain
+ADC HL,DE 5AED 2 0 plain
+ADC HL,HL 6AED 2 0 plain
+ADC HL,SP 7AED 2 0 plain
+ADD A,(HL) 86 1 0 plain
+ADD A,(IX<expr>) 86DD 2 1 index-z80
+ADD A,(IY<expr>) 86FD 2 1 index-z80
+ADD A,A 87 1 0 plain
+ADD A,B 80 1 0 plain
+ADD A,C 81 1 0 plain
+ADD A,D 82 1 0 plain
+ADD A,E 83 1 0 plain
+ADD A,H 84 1 0 plain
+ADD A,L 85 1 0 plain
+ADD A,<expr> C6 1 1 plain
+ADD HL,BC 09 1 0 plain
+ADD HL,DE 19 1 0 plain
+ADD HL,HL 29 1 0 plain
+ADD HL,SP 39 1 0 plain
+ADD IX,BC 09DD 2 0 plain
+ADD IX,DE 19DD 2 0 plain
+ADD IX,IX 29DD 2 0 plain
+ADD IX,SP 39DD 2 0 plain
+ADD IY,BC 09FD 2 0 plain
+ADD IY,DE 19FD 2 0 plain
+ADD IY,IY 29FD 2 0 plain
+ADD IY,SP 39FD 2 0 plain
+AND (HL) A6 1 0 plain
+AND (IX<expr>) A6DD 2 1 index-z80
+AND (IY<expr>) A6FD 2 1 index-z80
+AND A A7 1 0 plain
+AND B A0 1 0 plain
+AND C A1 1 0 plain
+AND D A2 1 0 plain
+AND E A3 1 0 plain
+AND H A4 1 0 plain
+AND L A5 1 0 plain
+AND <expr> E6 1 1 plain
+BIT <expr>,(HL) 46CB 2 0 bit-z80
+BIT <expr>,(IX<expr>) CBDD 2 2 bit-z80 post-or=4600
+BIT <expr>,(IY<expr>) CBFD 2 2 bit-z80 post-or=4600
+BIT <expr>,A 47CB 2 0 bit-z80
+BIT <expr>,B 40CB 2 0 bit-z80
+BIT <expr>,C 41CB 2 0 bit-z80
+BIT <expr>,D 42CB 2 0 bit-z80
+BIT <expr>,E 43CB 2 0 bit-z80
+BIT <expr>,H 44CB 2 0 bit-z80
+BIT <expr>,L 45CB 2 0 bit-z80
+CALL C,<expr> DC 1 2 plain
+CALL M,<expr> FC 1 2 plain
+CALL NC,<expr> D4 1 2 plain
+CALL NZ,<expr> C4 1 2 plain
+CALL P,<expr> F4 1 2 plain
+CALL PE,<expr> EC 1 2 plain
+CALL PO,<expr> E4 1 2 plain
+CALL Z,<expr> CC 1 2 plain
+CALL <expr> CD 1 2 plain
+CCF - 3F 1 0 plain
+CP (HL) BE 1 0 plain
+CP (IX<expr>) BEDD 2 1 index-z80
+CP (IY<expr>) BEFD 2 1 index-z80
+CP A BF 1 0 plain
+CP B B8 1 0 plain
+CP C B9 1 0 plain
+CP D BA 1 0 plain
+CP E BB 1 0 plain
+CP H BC 1 0 plain
+CP L BD 1 0 plain
+CP <expr> FE 1 1 plain
+CPD - A9ED 2 0 plain
+CPDR - B9ED 2 0 plain
+CPIR - B1ED 2 0 plain
+CPI - A1ED 2 0 plain
+CPL - 2F 1 0 plain
+DAA - 27 1 0 plain
+DEC (HL) 35 1 0 plain
+DEC (IX<expr>) 35DD 2 1 index-z80
+DEC (IY<expr>) 35FD 2 1 index-z80
+DEC A 3D 1 0 plain
+DEC B 05 1 0 plain
+DEC BC 0B 1 0 plain
+DEC C 0D 1 0 plain
+DEC D 15 1 0 plain
+DEC DE 1B 1 0 plain
+DEC E 1D 1 0 plain
+DEC H 25 1 0 plain
+DEC HL 2B 1 0 plain
+DEC IX 2BDD 2 0 plain
+DEC IY 2BFD 2 0 plain
+DEC L 2D 1 0 plain
+DEC SP 3B 1 0 plain
+DI - F3 1 0 plain
+DJNZ <expr> 10 1 1 rel8
+EI - FB 1 0 plain
+EX (SP),HL E3 1 0 plain
+EX (SP),IX E3DD 2 0 plain
+EX (SP),IY E3FD 2 0 plain
+EX AF,AF' 08 1 0 plain
+EX DE,HL EB 1 0 plain
+EXX - D9 1 0 plain
+HALT - 76 1 0 plain
+IM 0 46ED 2 0 plain
+IM 1 56ED 2 0 plain
+IM 2 5EED 2 0 plain
+IM0 - 46ED 2 0 plain
+IM1 - 56ED 2 0 plain
+IM2 - 5EED 2 0 plain
+IN A,(C) 78ED 2 0 plain
+IN B,(C) 40ED 2 0 plain
+IN C,(C) 48ED 2 0 plain
+IN D,(C) 50ED 2 0 plain
+IN E,(C) 58ED 2 0 plain
+IN H,(C) 60ED 2 0 plain
+IN L,(C) 68ED 2 0 plain
+IN A,(<expr>) DB 1 1 plain
+IN0 A,(<expr>) 38ED 2 1 plain class=2
+IN0 B,(<expr>) 00ED 2 1 plain class=2
+IN0 C,(<expr>) 08ED 2 1 plain class=2
+IN0 D,(<expr>) 10ED 2 1 plain class=2
+IN0 E,(<expr>) 18ED 2 1 plain class=2
+IN0 H,(<expr>) 20ED 2 1 plain class=2
+IN0 L,(<expr>) 28ED 2 1 plain class=2
+INC (HL) 34 1 0 plain
+INC (IX<expr>) 34DD 2 1 index-z80
+INC (IY<expr>) 34FD 2 1 index-z80
+INC A 3C 1 0 plain
+INC B 04 1 0 plain
+INC BC 03 1 0 plain
+INC C 0C 1 0 plain
+INC D 14 1 0 plain
+INC DE 13 1 0 plain
+INC E 1C 1 0 plain
+INC H 24 1 0 plain
+INC HL 23 1 0 plain
+INC IX 23DD 2 0 plain
+INC IY 23FD 2 0 plain
+INC L 2C 1 0 plain
+INC SP 33 1 0 plain
+IND - AAED 2 0 plain
+INDR - BAED 2 0 plain
+INI - A2ED 2 0 plain
+INIR - B2ED 2 0 plain
+JP (HL) E9 1 0 plain
+JP (IX) E9DD 2 0 plain
+JP (IY) E9FD 2 0 plain
+JP C,<expr> DA 1 2 plain
+JP M,<expr> FA 1 2 plain
+JP NC,<expr> D2 1 2 plain
+JP NZ,<expr> C2 1 2 plain
+JP P,<expr> F2 1 2 plain
+JP PE,<expr> EA 1 2 plain
+JP PO,<expr> E2 1 2 plain
+JP Z,<expr> CA 1 2 plain
+JP <expr> C3 1 2 plain
+JR C,<expr> 38 1 1 rel8
+JR NC,<expr> 30 1 1 rel8
+JR NZ,<expr> 20 1 1 rel8
+JR Z,<expr> 28 1 1 rel8
+JR <expr> 18 1 1 rel8
+LD (BC),A 02 1 0 plain
+LD (DE),A 12 1 0 plain
+LD (HL),A 77 1 0 plain
+LD (HL),B 70 1 0 plain
+LD (HL),C 71 1 0 plain
+LD (HL),D 72 1 0 plain
+LD (HL),E 73 1 0 plain
+LD (HL),H 74 1 0 plain
+LD (HL),L 75 1 0 plain
+LD (HL),<expr> 36 1 1 plain
+LD (IX<expr>),A 77DD 2 1 index-z80
+LD (IX<expr>),B 70DD 2 1 index-z80
+LD (IX<expr>),C 71DD 2 1 index-z80
+LD (IX<expr>),D 72DD 2 1 index-z80
+LD (IX<expr>),E 73DD 2 1 index-z80
+LD (IX<expr>),H 74DD 2 1 index-z80
+LD (IX<expr>),L 75DD 2 1 index-z80
+LD (IX<expr>),<expr> 36DD 2 2 index-z80
+LD (IY<expr>),A 77FD 2 1 index-z80
+LD (IY<expr>),B 70FD 2 1 index-z80
+LD (IY<expr>),C 71FD 2 1 index-z80
+LD (IY<expr>),D 72FD 2 1 index-z80
+LD (IY<expr>),E 73FD 2 1 index-z80
+LD (IY<expr>),H 74FD 2 1 index-z80
+LD (IY<expr>),L 75FD 2 1 index-z80
+LD (IY<expr>),<expr> 36FD 2 2 index-z80
+LD (<expr>),A 32 1 2 plain
+LD (<expr>),BC 43ED 2 2 plain
+LD (<expr>),DE 53ED 2 2 plain
+LD (<expr>),HL 22 1 2 plain
+LD (<expr>),IX 22DD 2 2 plain
+LD (<expr>),IY 22FD 2 2 plain
+LD (<expr>),SP 73ED 2 2 plain
+LD A,(BC) 0A 1 0 plain
+LD A,(DE) 1A 1 0 plain
+LD A,(HL) 7E 1 0 plain
+LD A,(IX<expr>) 7EDD 2 1 index-z80
+LD A,(IY<expr>) 7EFD 2 1 index-z80
+LD A,A 7F 1 0 plain
+LD A,B 78 1 0 plain
+LD A,C 79 1 0 plain
+LD A,D 7A 1 0 plain
+LD A,E 7B 1 0 plain
+LD A,H 7C 1 0 plain
+LD A,I 57ED 2 0 plain
+LD A,L 7D 1 0 plain
+LD A,R 5FED 2 0 plain
+LD A,(<expr>) 3A 1 2 plain
+LD A,<expr> 3E 1 1 plain
+LD B,(HL) 46 1 0 plain
+LD B,(IX<expr>) 46DD 2 1 index-z80
+LD B,(IY<expr>) 46FD 2 1 index-z80
+LD B,A 47 1 0 plain
+LD B,B 40 1 0 plain
+LD B,C 41 1 0 plain
+LD B,D 42 1 0 plain
+LD B,E 43 1 0 plain
+LD B,H 44 1 0 plain
+LD B,L 45 1 0 plain
+LD B,<expr> 06 1 1 plain
+LD BC,(<expr>) 4BED 2 2 plain
+LD BC,<expr> 01 1 2 plain
+LD C,(HL) 4E 1 0 plain
+LD C,(IX<expr>) 4EDD 2 1 index-z80
+LD C,(IY<expr>) 4EFD 2 1 index-z80
+LD C,A 4F 1 0 plain
+LD C,B 48 1 0 plain
+LD C,C 49 1 0 plain
+LD C,D 4A 1 0 plain
+LD C,E 4B 1 0 plain
+LD C,H 4C 1 0 plain
+LD C,L 4D 1 0 plain
+LD C,<expr> 0E 1 1 plain
+LD D,(HL) 56 1 0 plain
+LD D,(IX<expr>) 56DD 2 1 index-z80
+LD D,(IY<expr>) 56FD 2 1 index-z80
+LD D,A 57 1 0 plain
+LD D,B 50 1 0 plain
+LD D,C 51 1 0 plain
+LD D,D 52 1 0 plain
+LD D,E 53 1 0 plain
+LD D,H 54 1 0 plain
+LD D,L 55 1 0 plain
+LD D,<expr> 16 1 1 plain
+LD DE,(<expr>) 5BED 2 2 plain
+LD DE,<expr> 11 1 2 plain
+LD E,(HL) 5E 1 0 plain
+LD E,(IX<expr>) 5EDD 2 1 index-z80
+LD E,(IY<expr>) 5EFD 2 1 index-z80
+LD E,A 5F 1 0 plain
+LD E,B 58 1 0 plain
+LD E,C 59 1 0 plain
+LD E,D 5A 1 0 plain
+LD E,E 5B 1 0 plain
+LD E,H 5C 1 0 plain
+LD E,L 5D 1 0 plain
+LD E,<expr> 1E 1 1 plain
+LD H,(HL) 66 1 0 plain
+LD H,(IX<expr>) 66DD 2 1 index-z80
+LD H,(IY<expr>) 66FD 2 1 index-z80
+LD H,A 67 1 0 plain
+LD H,B 60 1 0 plain
+LD H,C 61 1 0 plain
+LD H,D 62 1 0 plain
+LD H,E 63 1 0 plain
+LD H,H 64 1 0 plain
+LD H,L 65 1 0 plain
+LD H,<expr> 26 1 1 plain
+LD HL,(<expr>) 2A 1 2 plain
+LD HL,<expr> 21 1 2 plain
+LD I,A 47ED 2 0 plain
+LD IX,(<expr>) 2ADD 2 2 plain
+LD IX,<expr> 21DD 2 2 plain
+LD IY,(<expr>) 2AFD 2 2 plain
+LD IY,<expr> 21FD 2 2 plain
+LD L,(HL) 6E 1 0 plain
+LD L,(IX<expr>) 6EDD 2 1 index-z80
+LD L,(IY<expr>) 6EFD 2 1 index-z80
+LD L,A 6F 1 0 plain
+LD L,B 68 1 0 plain
+LD L,C 69 1 0 plain
+LD L,D 6A 1 0 plain
+LD L,E 6B 1 0 plain
+LD L,H 6C 1 0 plain
+LD L,L 6D 1 0 plain
+LD L,<expr> 2E 1 1 plain
+LD R,A 4FED 2 0 plain
+LD SP,(<expr>) 7BED 2 2 plain
+LD SP,HL F9 1 0 plain
+LD SP,IX F9DD 2 0 plain
+LD SP,IY F9FD 2 0 plain
+LD SP,<expr> 31 1 2 plain
+LDD - A8ED 2 0 plain
+LDDR - B8ED 2 0 plain
+LDI - A0ED 2 0 plain
+LDIR - B0ED 2 0 plain
+NEG - 44ED 2 0 plain
+NOP - 00 1 0 plain
+MLT BC 4CED 2 0 plain class=2
+MLT DE 5CED 2 0 plain class=2
+MLT HL 6CED 2 0 plain class=2
+MLT SP 7CED 2 0 plain class=2
+OR (HL) B6 1 0 plain
+OR (IX<expr>) B6DD 2 1 index-z80
+OR (IY<expr>) B6FD 2 1 index-z80
+OR A B7 1 0 plain
+OR B B0 1 0 plain
+OR C B1 1 0 plain
+OR D B2 1 0 plain
+OR E B3 1 0 plain
+OR H B4 1 0 plain
+OR L B5 1 0 plain
+OR <expr> F6 1 1 plain
+OTDM - 8BED 2 0 plain class=2
+OTDMR - 9BED 2 0 plain class=2
+OTDR - BBED 2 0 plain
+OTIM - 83ED 2 0 plain class=2
+OTIMR - 93ED 2 0 plain class=2
+OTIR - B3ED 2 0 plain
+OUT (C),A 79ED 2 0 plain
+OUT (C),B 41ED 2 0 plain
+OUT (C),C 49ED 2 0 plain
+OUT (C),D 51ED 2 0 plain
+OUT (C),E 59ED 2 0 plain
+OUT (C),H 61ED 2 0 plain
+OUT (C),L 69ED 2 0 plain
+OUT (<expr>),A D3 1 1 plain
+OUT0 (<expr>),A 39ED 2 1 plain class=2
+OUT0 (<expr>),B 01ED 2 1 plain class=2
+OUT0 (<expr>),C 09ED 2 1 plain class=2
+OUT0 (<expr>),D 11ED 2 1 plain class=2
+OUT0 (<expr>),E 19ED 2 1 plain class=2
+OUT0 (<expr>),H 21ED 2 1 plain class=2
+OUT0 (<expr>),L 29ED 2 1 plain class=2
+OUTD - ABED 2 0 plain
+OUTI - A3ED 2 0 plain
+POP AF F1 1 0 plain
+POP BC C1 1 0 plain
+POP DE D1 1 0 plain
+POP HL E1 1 0 plain
+POP IX E1DD 2 0 plain
+POP IY E1FD 2 0 plain
+PUSH AF F5 1 0 plain
+PUSH BC C5 1 0 plain
+PUSH DE D5 1 0 plain
+PUSH HL E5 1 0 plain
+PUSH IX E5DD 2 0 plain
+PUSH IY E5FD 2 0 plain
+RES <expr>,(HL) 86CB 2 0 bit-z80
+RES <expr>,(IX<expr>) CBDD 2 2 bit-z80 post-or=8600
+RES <expr>,(IY<expr>) CBFD 2 2 bit-z80 post-or=8600
+RES <expr>,A 87CB 2 0 bit-z80
+RES <expr>,B 80CB 2 0 bit-z80
+RES <expr>,C 81CB 2 0 bit-z80
+RES <expr>,D 82CB 2 0 bit-z80
+RES <expr>,E 83CB 2 0 bit-z80
+RES <expr>,H 84CB 2 0 bit-z80
+RES <expr>,L 85CB 2 0 bit-z80
+RET - C9 1 0 plain
+RET C D8 1 0 plain
+RET M F8 1 0 plain
+RET NC D0 1 0 plain
+RET NZ C0 1 0 plain
+RET P F0 1 0 plain
+RET PE E8 1 0 plain
+RET PO E0 1 0 plain
+RET Z C8 1 0 plain
+RETI - 4DED 2 0 plain
+RETN - 45ED 2 0 plain
+RL (HL) 16CB 2 0 plain
+RL (IX<expr>) CBDD 2 2 index-z80 post-or=1600
+RL (IY<expr>) CBFD 2 2 index-z80 post-or=1600
+RL A 17CB 2 0 plain
+RL B 10CB 2 0 plain
+RL C 11CB 2 0 plain
+RL D 12CB 2 0 plain
+RL E 13CB 2 0 plain
+RL H 14CB 2 0 plain
+RL L 15CB 2 0 plain
+RLA - 17 1 0 plain
+RLC (HL) 06CB 2 0 plain
+RLC (IX<expr>) CBDD 2 2 index-z80 post-or=600
+RLC (IY<expr>) CBFD 2 2 index-z80 post-or=600
+RLC A 07CB 2 0 plain
+RLC B 00CB 2 0 plain
+RLC C 01CB 2 0 plain
+RLC D 02CB 2 0 plain
+RLC E 03CB 2 0 plain
+RLC H 04CB 2 0 plain
+RLC L 05CB 2 0 plain
+RLCA - 07 1 0 plain
+RLD - 6FED 2 0 plain
+RR (HL) 1ECB 2 0 plain
+RR (IX<expr>) CBDD 2 2 index-z80 post-or=1E00
+RR (IY<expr>) CBFD 2 2 index-z80 post-or=1E00
+RR A 1FCB 2 0 plain
+RR B 18CB 2 0 plain
+RR C 19CB 2 0 plain
+RR D 1ACB 2 0 plain
+RR E 1BCB 2 0 plain
+RR H 1CCB 2 0 plain
+RR L 1DCB 2 0 plain
+RRA - 1F 1 0 plain
+RRC (HL) 0ECB 2 0 plain
+RRC (IX<expr>) CBDD 2 2 index-z80 post-or=E00
+RRC (IY<expr>) CBFD 2 2 index-z80 post-or=E00
+RRC A 0FCB 2 0 plain
+RRC B 08CB 2 0 plain
+RRC C 09CB 2 0 plain
+RRC D 0ACB 2 0 plain
+RRC E 0BCB 2 0 plain
+RRC H 0CCB 2 0 plain
+RRC L 0DCB 2 0 plain
+RRCA - 0F 1 0 plain
+RRD - 67ED 2 0 plain
+RST 00H C7 1 0 plain
+RST 08H CF 1 0 plain
+RST 10H D7 1 0 plain
+RST 18H DF 1 0 plain
+RST 20H E7 1 0 plain
+RST 28H EF 1 0 plain
+RST 30H F7 1 0 plain
+RST 38H FF 1 0 plain
+RST 00 C7 1 0 plain
+RST 08 CF 1 0 plain
+RST 10 D7 1 0 plain
+RST 18 DF 1 0 plain
+RST 20 E7 1 0 plain
+RST 28 EF 1 0 plain
+RST 30 F7 1 0 plain
+RST 38 FF 1 0 plain
+SBC A,(HL) 9E 1 0 plain
+SBC A,(IX<expr>) 9EDD 2 1 index-z80
+SBC A,(IY<expr>) 9EFD 2 1 index-z80
+SBC A,A 9F 1 0 plain
+SBC A,B 98 1 0 plain
+SBC A,C 99 1 0 plain
+SBC A,D 9A 1 0 plain
+SBC A,E 9B 1 0 plain
+SBC A,H 9C 1 0 plain
+SBC A,L 9D 1 0 plain
+SBC HL,BC 42ED 2 0 plain
+SBC HL,DE 52ED 2 0 plain
+SBC HL,HL 62ED 2 0 plain
+SBC HL,SP 72ED 2 0 plain
+SBC A,<expr> DE 1 1 plain
+SCF - 37 1 0 plain
+SET <expr>,(HL) C6CB 2 0 bit-z80
+SET <expr>,(IX<expr>) CBDD 2 2 bit-z80 post-or=C600
+SET <expr>,(IY<expr>) CBFD 2 2 bit-z80 post-or=C600
+SET <expr>,A C7CB 2 0 bit-z80
+SET <expr>,B C0CB 2 0 bit-z80
+SET <expr>,C C1CB 2 0 bit-z80
+SET <expr>,D C2CB 2 0 bit-z80
+SET <expr>,E C3CB 2 0 bit-z80
+SET <expr>,H C4CB 2 0 bit-z80
+SET <expr>,L C5CB 2 0 bit-z80
+SLA (HL) 26CB 2 0 plain
+SLA (IX<expr>) CBDD 2 2 index-z80 post-or=2600
+SLA (IY<expr>) CBFD 2 2 index-z80 post-or=2600
+SLA A 27CB 2 0 plain
+SLA B 20CB 2 0 plain
+SLA C 21CB 2 0 plain
+SLA D 22CB 2 0 plain
+SLA E 23CB 2 0 plain
+SLA H 24CB 2 0 plain
+SLA L 25CB 2 0 plain
+SLP - 76ED 2 0 plain class=2
+SRA (HL) 2ECB 2 0 plain
+SRA (IX<expr>) CBDD 2 2 index-z80 post-or=2E00
+SRA (IY<expr>) CBFD 2 2 index-z80 post-or=2E00
+SRA A 2FCB 2 0 plain
+SRA B 28CB 2 0 plain
+SRA C 29CB 2 0 plain
+SRA D 2ACB 2 0 plain
+SRA E 2BCB 2 0 plain
+SRA H 2CCB 2 0 plain
+SRA L 2DCB 2 0 plain
+SRL (HL) 3ECB 2 0 plain
+SRL (IX<expr>) CBDD 2 2 index-z80 post-or=3E00
+SRL (IY<expr>) CBFD 2 2 index-z80 post-or=3E00
+SRL A 3FCB 2 0 plain
+SRL B 38CB 2 0 plain
+SRL C 39CB 2 0 plain
+SRL D 3ACB 2 0 plain
+SRL E 3BCB 2 0 plain
+SRL H 3CCB 2 0 plain
+SRL L 3DCB 2 0 plain
+SUB (HL) 96 1 0 plain
+SUB (IX<expr>) 96DD 2 1 index-z80
+SUB (IY<expr>) 96FD 2 1 index-z80
+SUB A 97 1 0 plain
+SUB B 90 1 0 plain
+SUB C 91 1 0 plain
+SUB D 92 1 0 plain
+SUB E 93 1 0 plain
+SUB H 94 1 0 plain
+SUB L 95 1 0 plain
+SUB <expr> D6 1 1 plain
+TST A 3CED 2 0 plain class=2
+TST B 04ED 2 0 plain class=2
+TST C 0CED 2 0 plain class=2
+TST D 14ED 2 0 plain class=2
+TST E 1CED 2 0 plain class=2
+TST H 24ED 2 0 plain class=2
+TST L 2CED 2 0 plain class=2
+TST (HL) 34ED 2 0 plain class=2
+TST <expr> 64ED 2 1 plain class=2
+TSTIO <expr> 74ED 2 1 plain class=2
+XOR (HL) AE 1 0 plain
+XOR (IX<expr>) AEDD 2 1 index-z80
+XOR (IY<expr>) AEFD 2 1 index-z80
+XOR A AF 1 0 plain
+XOR B A8 1 0 plain
+XOR C A9 1 0 plain
+XOR D AA 1 0 plain
+XOR E AB 1 0 plain
+XOR H AC 1 0 plain
+XOR L AD 1 0 plain
+XOR <expr> EE 1 1 plain

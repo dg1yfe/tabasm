@@ -1,0 +1,23 @@
+0001   0000             ; same_inst matching across mnemonics that share a long prefix.
+0002   0000             ; Assemble with -51.
+0003   0000             ;
+0004   0000             ; The loader records the previous row's mnemonic to detect consecutive rows of
+0005   0000             ; the same instruction (the same_inst optimisation). That record used to be a
+0006   0000             ; 10-byte buffer written truncated but compared in full, so two DIFFERENT
+0007   0000             ; mnemonics sharing a 9-character prefix compared equal: the second was then
+0008   0000             ; treated as an operand variant of the first, encoded with the wrong opcode,
+0009   0000             ; and could never be matched on its own.
+0010   0000             ;
+0011   0000             ; Here ABCDEFGHIJ (10 chars) and ABCDEFGHI (9 chars) share the 9-char prefix
+0012   0000             ; that the old buffer truncated to. Each must keep its own opcode: 11 and 22.
+0013   0000             ; Documented in the notes.
+0014   0000                     .org  0
+0015   0000             
+0016   0000                     .addinstr ABCDEFGHIJ A 11 1 NO 1
+0017   0000                     .addinstr ABCDEFGHI  A 22 1 NO 1
+0018   0000             
+0019   0000 11                  ABCDEFGHIJ A            ; must emit 11
+0020   0001 22                  ABCDEFGHI  A            ; must emit 22, not 11, and not error
+0021   0002             
+0022   0002                     .end
+tabasm: Number of errors = 0

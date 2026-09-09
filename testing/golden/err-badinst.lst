@@ -1,0 +1,10 @@
+0001   0000             ; Mnemonics that appear in no instruction table.
+0002   0000             ; Exercises the "bad instruction" diagnostic and the table-miss path.
+0003   0000                     .org  0
+0004   0000                     frobnicate a,r0
+err-badinst.asm line 0004: unrecognized instruction.          (FROBNICATE)
+0005   0000 00                  nop
+0006   0001                     wibble
+err-badinst.asm line 0006: unrecognized instruction.          (WIBBLE)
+0007   0001                     .end
+tabasm: Number of errors = 2

@@ -1,0 +1,5 @@
+tabasm 0.1.0 -- table-driven cross-assembler.
+ Clean-room reimplementation from the TASM behavioural specification.
+xyz: pass 1 complete.
+xyz: pass 2 complete.
+xyz: Number of errors = 0

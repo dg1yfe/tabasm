@@ -1,0 +1,11 @@
+0001   0000             ; SJMP on the 8051 carries a single-byte signed displacement (-128..+127).
+0002   0000             ; The target here is far outside that window, exercising the range check in
+0003   0000             ; the PC-relative encoding rule (R1).
+0004   0000                     .org  0
+err-range.asm line 0005: Range of relative branch exceeded. 
+0005   0000 80 00               sjmp  faraway
+0006   0200                     .org  200h
+0007   0200             faraway:
+0008   0200 00                  nop
+0009   0201                     .end
+tabasm: Number of errors = 1

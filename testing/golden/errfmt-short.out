@@ -1,0 +1,8 @@
+tabasm 0.1.0 -- table-driven cross-assembler.
+ Clean-room reimplementation from the TASM behavioural specification.
+tabasm: pass 1 complete.
+err-undef.asm
+err-undef.asm
+err-undef.asm
+tabasm: pass 2 complete.
+tabasm: Number of errors = 3

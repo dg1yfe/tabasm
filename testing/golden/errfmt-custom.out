@@ -1,0 +1,8 @@
+tabasm 0.1.0 -- table-driven cross-assembler.
+ Clean-room reimplementation from the TASM behavioural specification.
+tabasm: pass 1 complete.
+err-undef.asm(4): Label not found: (no_such_label)
+err-undef.asm(4): Unused data in MS byte of argument. (200)
+err-undef.asm(5): Label not found: (also_missing)
+tabasm: pass 2 complete.
+tabasm: Number of errors = 3

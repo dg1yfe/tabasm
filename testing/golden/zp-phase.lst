@@ -1,0 +1,30 @@
+0001   0000             ; Pass-1/pass-2 size disagreement and the phase error it produces.
+0002   0000             ; Assemble with -65 (6502).
+0003   0000             ;
+0004   0000             ; An undefined symbol evaluates to 0x20000, above the address space, so the
+0005   0000             ; zero-page rule declines to shorten in pass 1 and reserves three bytes. In
+0006   0000             ; pass 2 the symbol resolves to a zero-page address and only two are emitted,
+0007   0000             ; so a label following the instruction keeps its pass-1 value while the counter
+0008   0000             ; has moved on. The mismatch is reported as "label value misalligned."
+0009   0000             ;
+0010   1000                     .org  1000h
+0011   1000             
+0012   1000             ; Baseline: already defined, shortens in both passes, no disagreement.
+0013   1000             back    .equ  20h
+0014   1000 A5 20               lda   back
+0015   1002             
+0016   1002             ; Forward reference to a non-zero-page address: the sentinel makes pass 1
+0017   1002             ; reserve the long form, and pass 2 agrees. No error.
+0018   1002 AD 34 12            lda   faraway
+0019   1005             
+0020   1005             ; Forward reference to a zero-page address: the passes disagree.
+0021   1005 A5 21               lda   fwd
+0022   1007 EA          after   nop
+zp-phase.asm line 0022: label value misalligned.           (after)
+0023   1008             fwd     .equ  21h
+0024   1008             faraway .equ  1234h
+0025   1008             
+0026   1008             ; Emits the pass-1 value of "after", not the address the nop occupies.
+0027   1008 08                  .byte after
+0028   1009                     .end
+tabasm: Number of errors = 1

@@ -1,0 +1,12 @@
+0001   0000             ; The plain symbol file (-s or .SYM): "%-16s  %04x" per line -- name in a
+0002   0000             ; 16-wide field, two spaces, then the value as four lower-case hex digits.
+0003   0000             ; No "AS " prefix, no segment letter and no colon (that is the .AVSYM format,
+0004   0000             ; §9.6). The value is masked to 16 bits: wide below is $12abcd -> abcd.
+0005   0000             ; Verified byte-for-byte against the 2001 release binary.
+0006   0000                     .org 0
+0007   0000             alpha   .equ $12
+0008   0000             beta    .equ $abcd
+0009   0000             wide    .equ $12abcd
+0010   0000 00                  nop
+0011   0001                     .end
+tabasm: Number of errors = 0

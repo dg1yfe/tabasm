@@ -1,0 +1,23 @@
+0001   0000             ; The label table is ordered by a shaker (cocktail) sort keyed on the FIRST
+0002   0000             ; character, whose boundary bookkeeping stops early -- so some definition orders
+0003   0000             ; come out NOT fully sorted . Here the first characters are b,d,a,a,l
+0004   0000             ; and the result is a,b,a,d,l (ayy bee azz dee ell), not the fully sorted
+0005   0000             ; a,a,b,d,l: after one back-and-forth sweep the active window collapses with
+0006   0000             ; 'bee' still ahead of 'azz'. Verified byte-for-byte against the 2001 release
+0007   0000             ; binary; the shipped 6805 and 6800 programs exercise the same quirk.
+0008   0000                     .org 0
+0009   0000             bee     .equ 1
+0010   0000             dee     .equ 2
+0011   0000             ayy     .equ 3
+0012   0000             azz     .equ 4
+0013   0000             ell     .equ 5
+0014   0000                     .end
+
+
+
+Label        Value      Label        Value      Label        Value
+------------------      ------------------      ------------------
+ayy           0003      azz           0004      bee           0001      
+dee           0002      ell           0005      
+
+tabasm: Number of errors = 0

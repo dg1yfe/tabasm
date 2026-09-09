@@ -1,0 +1,19 @@
+0001   0000             ; The AVSIM symbol file (.AVSYM) carries the segment letter before the colon.
+0002   0000             ; This exercises all five: N C B X D, set by .NSEG/.CSEG/.BSEG/.XSEG/.DSEG.
+0003   0000             ; The D label is $12abcd to show the value is masked to 16 bits (-> abcd),
+0004   0000             ; the same as the plain file and the export file. Verified byte-for-byte
+0005   0000             ; against the 2001 release binary.
+0006   0000                     .org 0
+0007   0000                     .avsym
+0008   0000                     .nseg
+0009   0000             ns      .equ $11
+0010   0000                     .cseg
+0011   0000             cs      .equ $22
+0012   0000                     .bseg
+0013   0000             bs      .equ $33
+0014   0000                     .xseg
+0015   0000             xs      .equ $44
+0016   0000                     .dseg
+0017   0000             ds      .equ $12abcd
+0018   0000                     .end
+tabasm: Number of errors = 0

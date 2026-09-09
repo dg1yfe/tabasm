@@ -1,0 +1,48 @@
+0001   0000             ; Auxiliary-register range on the TMS320 family.
+0002   0000             ;
+0003   0000             ; Assembled twice: as "tms-arp-3225" with -3225, where it is clean, and as
+0004   0000             ; "tms-arp-3210" with -3210, where the last two LAR lines are diagnosed.
+0005   0000             ;
+0006   0000             ; TWO SEPARATE MECHANISMS produce that difference, and they are easy to
+0007   0000             ; conflate:
+0008   0000             ;
+0009   0000             ;   LARP uses the T1 rule with a validation mask taken from the table's OR
+0010   0000             ;   column -- 0001 in tasm3210.tab, 0007 in tasm3225.tab. That difference comes
+0011   0000             ;   from the TABLE, and the diagnostic is the generic
+0012   0000             ;   "Range of argument exceeded."
+0013   0000             ;
+0014   0000             ;   LAR uses the TAR rule, whose ARP width is decided by a literal string
+0015   0000             ;   comparison against the -<nn> OPTION TEXT: "3225" permits AR0-AR7, anything
+0016   0000             ;   else permits only AR0-AR1. That is independent of the table's contents, and
+0017   0000             ;   the diagnostic is the distinct "Range of ARP argument exceeded."
+0018   0000             ;
+0019   0000             ; This case pins both. It does not by itself separate them, since changing the
+0020   0000             ; selector also changes the table. The isolating experiment -- one table file
+0021   0000             ; copied under two selector names, giving different ARP widths from identical
+0022   0000             ; bytes -- is recorded in the manual
+0023   0000             ;
+0024   0000             ; A reimplementation cannot derive the ARP width from the .tab file and must
+0025   0000             ; special-case the selector. The TMS32010 has two auxiliary registers; the
+0026   0000             ; TMS320C25 has eight.
+0027   0000                     .org  0
+0028   0000             
+0029   0000             ; Table-driven mask (T1). Clean for both parts.
+0030   0000 68 80               LARP  0
+0031   0001 68 81               LARP  1
+0032   0002             
+0033   0002             ; Table-driven mask (T1). Out of range for the 32010's 1-bit field.
+tms-arp-width.asm line 0034: Range of argument exceeded. (2)
+0034   0002 68 80               LARP  2
+0035   0003             
+0036   0003             ; Selector-driven ARP width (TAR). AR0 and AR1 suit both parts.
+0037   0003 38 0A               LAR   0,10
+0038   0004 39 0B               LAR   1,11
+0039   0005             
+0040   0005             ; Selector-driven ARP width (TAR). AR5 and AR7 need the C25.
+tms-arp-width.asm line 0041: Range of ARP argument exceeded. (5)
+0041   0005 39 0C               LAR   5,12
+tms-arp-width.asm line 0042: Range of ARP argument exceeded. (7)
+0042   0006 39 0D               LAR   7,13
+0043   0007             
+0044   0007                     .end
+tabasm: Number of errors = 3

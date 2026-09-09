@@ -1,0 +1,45 @@
+0001   0000             ; Value width. Assemble with -51 -l.
+0002   0000             ;
+0003   0000             ; Expression values, label values and the program counter are 32-bit, matching
+0004   0000             ; the original targets, and are pinned to that width rather than following the
+0005   0000             ; host's "long".
+0006   0000             ;
+0007   0000             ; This is invisible in emitted object code, which masks to 8 or 16 bits, and
+0008   0000             ; visible only where a full value is printed -- which in practice means the
+0009   0000             ; label table produced by -l. An LP64 build that let these follow "long" listed
+0010   0000             ; a negative label as FFFFFFFFFFFFFFF9 where the original produced FFFFFFF9.
+0011   0000             ; That was the single difference across 363 artefacts compared against the 2001
+0012   0000             ; release binary.
+0013   0000             ;
+0014   0000                     .org  0
+0015   0000             
+0016   0000             neg1    .equ  -1                ; FFFFFFFF
+0017   0000             neg7    .equ  -7                ; FFFFFFF9
+0018   0000             negbig  .equ  -65536            ; FFFF0000
+0019   0000             notzero .equ  ~0                ; FFFFFFFF -- complement, not negation
+0020   0000             shifted .equ  1<<31             ; 80000000 -- sign bit of a 32-bit value
+0021   0000             pos     .equ  32767             ; 00007FFF
+0022   0000             
+0023   0000             ; Emission masks, so the object bytes are unaffected by the width.
+0024   0000 F9                  .byte neg7              ; F9
+0025   0001 F9 FF               .word neg7              ; F9 FF
+0026   0003 FF                  .byte notzero           ; FF
+0027   0004             
+0028   0004                     .end
+
+
+
+Type Key: N=NULL_SEG C=CODE_SEG B=BIT_SEG X=EXTD_SEG D=DATA_SEG
+          L=Local
+          E=Export
+
+Value    Type   Label
+-----    ----   ------------------------------
+FFFFFFFF     N      neg1                            
+FFFFFFF9     N      neg7                            
+FFFF0000     N      negbig                          
+FFFFFFFF     N      notzero                         
+7FFF     N      pos                             
+80000000     N      shifted                         
+
+tabasm: Number of errors = 0

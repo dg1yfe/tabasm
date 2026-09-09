@@ -1,0 +1,304 @@
+%format         2
+%banner         "Table-driven 6800-6811 Assembler"
+%opcode-order   ms-first
+%address-unit   byte
+%aux-registers  2
+%columns        mnemonic operands opcode op-bytes arg-bytes rule
+ABA - 1B 1 0 plain
+ABX - 3A 1 0 plain class=2
+ABY - 183A 2 0 plain class=4
+ADCA #<expr> 89 1 1 plain
+ADCA <expr>,Y 18A9 2 1 plain class=4
+ADCA <expr>,X A9 1 1 plain
+ADCA <expr> B9 1 2 zero-page-moto
+ADCB #<expr> C9 1 1 plain
+ADCB <expr>,Y 18E9 2 1 plain class=4
+ADCB <expr>,X E9 1 1 plain
+ADCB <expr> F9 1 2 zero-page-moto
+ADDA #<expr> 8B 1 1 plain
+ADDA <expr>,Y 18AB 2 1 plain class=4
+ADDA <expr>,X AB 1 1 plain
+ADDA <expr> BB 1 2 zero-page-moto
+ADDB #<expr> CB 1 1 plain
+ADDB <expr>,Y 18EB 2 1 plain class=4
+ADDB <expr>,X EB 1 1 plain
+ADDB <expr> FB 1 2 zero-page-moto
+ADDD #<expr> C3 1 2 swap-bytes class=2
+ADDD <expr>,Y 18E3 2 1 plain class=4
+ADDD <expr>,X E3 1 1 plain class=2
+ADDD <expr> F3 1 2 zero-page-moto class=2
+ANDA #<expr> 84 1 1 plain
+ANDA <expr>,Y 18A4 2 1 plain class=4
+ANDA <expr>,X A4 1 1 plain
+ANDA <expr> B4 1 2 zero-page-moto
+ANDB #<expr> C4 1 1 plain
+ANDB <expr>,Y 18E4 2 1 plain class=4
+ANDB <expr>,X E4 1 1 plain
+ANDB <expr> F4 1 2 zero-page-moto
+ASL <expr>,Y 1868 2 1 plain class=4
+ASL <expr>,X 68 1 1 plain
+ASL <expr> 78 1 2 swap-bytes
+ASLA - 48 1 0 plain
+ASLB - 58 1 0 plain
+ASLD - 05 1 0 plain class=2
+ASR <expr>,Y 1867 2 1 plain class=4
+ASR <expr>,X 67 1 1 plain
+ASR <expr> 77 1 2 swap-bytes
+ASRA - 47 1 0 plain
+ASRB - 57 1 0 plain
+BCC <expr> 24 1 1 rel8
+BCLR <expr>,X,<expr> 1D 1 2 combine class=4
+BCLR <expr>,Y,<expr> 181D 2 2 combine class=4
+BCLR <expr>,#<expr> 15 1 2 combine class=4
+BCLR <expr>,<expr> 15 1 2 combine class=4
+BCS <expr> 25 1 1 rel8
+BEQ <expr> 27 1 1 rel8
+BGE <expr> 2C 1 1 rel8
+BGT <expr> 2E 1 1 rel8
+BHI <expr> 22 1 1 rel8
+BHS <expr> 24 1 1 rel8
+BITA #<expr> 85 1 1 plain
+BITA <expr>,Y 18A5 2 1 plain class=4
+BITA <expr>,X A5 1 1 plain
+BITA <expr> B5 1 2 zero-page-moto
+BITB #<expr> C5 1 1 plain
+BITB <expr>,Y 18E5 2 1 plain class=4
+BITB <expr>,X E5 1 1 plain
+BITB <expr> F5 1 2 zero-page-moto
+BLE <expr> 2F 1 1 rel8
+BLO <expr> 25 1 1 rel8
+BLS <expr> 23 1 1 rel8
+BLT <expr> 2D 1 1 rel8
+BMI <expr> 2B 1 1 rel8
+BNE <expr> 26 1 1 rel8
+BPL <expr> 2A 1 1 rel8
+BRA <expr> 20 1 1 rel8
+BRCLR <expr>,X,<expr>,<expr> 1F 1 3 three-rel class=4
+BRCLR <expr>,Y,<expr>,<expr> 181F 2 3 three-rel class=4
+BRCLR <expr>,<expr>,<expr> 13 1 3 three-rel class=4
+BRN <expr> 21 1 1 rel8 class=2
+BRSET <expr>,X,<expr>,<expr> 1E 1 3 three-rel class=4
+BRSET <expr>,Y,<expr>,<expr> 181E 2 3 three-rel class=4
+BRSET <expr>,<expr>,<expr> 12 1 3 three-rel class=4
+BSET <expr>,X,<expr> 1C 1 2 combine class=4
+BSET <expr>,Y,<expr> 181C 2 2 combine class=4
+BSET <expr>,#<expr> 14 1 2 combine class=4
+BSET <expr>,<expr> 14 1 2 combine class=4
+BSR <expr> 8D 1 1 rel8
+BVC <expr> 28 1 1 rel8
+BVS <expr> 29 1 1 rel8
+CBA - 11 1 0 plain
+CLC - 0C 1 0 plain
+CLI - 0E 1 0 plain
+CLR <expr>,Y 186F 2 1 plain class=4
+CLR <expr>,X 6F 1 1 plain
+CLR <expr> 7F 1 2 swap-bytes
+CLRA - 4F 1 0 plain
+CLRB - 5F 1 0 plain
+CLV - 0A 1 0 plain
+CMPA #<expr> 81 1 1 plain
+CMPA <expr>,X A1 1 1 plain
+CMPA <expr>,Y 18A1 2 1 plain class=4
+CMPA <expr> B1 1 2 zero-page-moto
+CMPB #<expr> C1 1 1 plain
+CMPB <expr>,Y 18E1 2 1 plain class=4
+CMPB <expr>,X E1 1 1 plain
+CMPB <expr> F1 1 2 zero-page-moto
+CMPD #<expr> 1A83 2 2 swap-bytes class=4
+CMPD <expr>,X 1AA3 2 1 plain class=4
+CMPD <expr>,Y CDA3 2 1 plain class=4
+CMPD <expr> 1AB3 2 2 zero-page-moto class=4
+COM <expr>,X 63 1 1 plain
+COM <expr>,Y 1863 2 1 plain class=4
+COM <expr> 73 1 2 swap-bytes
+COMA - 43 1 0 plain
+COMB - 53 1 0 plain
+CPD #<expr> 1A83 2 2 swap-bytes class=4
+CPD <expr>,X 1AA3 2 1 plain class=4
+CPD <expr>,Y CDA3 2 1 plain class=4
+CPD <expr> 1AB3 2 2 zero-page-moto class=4
+CPX #<expr> 8C 1 2 swap-bytes
+CPX <expr>,X AC 1 1 plain
+CPX <expr>,Y CDAC 2 1 plain class=4
+CPX <expr> BC 1 2 zero-page-moto
+CPY #<expr> 188C 2 2 swap-bytes class=4
+CPY <expr>,Y 18AC 2 1 plain class=4
+CPY <expr>,X 1AAC 2 1 plain class=4
+CPY <expr> 18BC 2 2 zero-page-moto class=4
+DAA - 19 1 0 plain
+DEC <expr>,Y 186A 2 1 plain class=4
+DEC <expr>,X 6A 1 1 plain
+DEC <expr> 7A 1 2 swap-bytes
+DECA - 4A 1 0 plain
+DECB - 5A 1 0 plain
+DES - 34 1 0 plain
+DEX - 09 1 0 plain
+DEY - 1809 2 0 plain class=4
+EORA #<expr> 88 1 1 plain
+EORA <expr>,Y 18A8 2 1 plain class=4
+EORA <expr>,X A8 1 1 plain
+EORA <expr> B8 1 2 zero-page-moto
+EORB #<expr> C8 1 1 plain
+EORB <expr>,Y 18E8 2 1 plain class=4
+EORB <expr>,X E8 1 1 plain
+EORB <expr> F8 1 2 zero-page-moto
+FDIV - 03 1 0 plain class=4
+IDIV - 02 1 0 plain class=4
+INC <expr>,Y 186C 2 1 plain class=4
+INC <expr>,X 6C 1 1 plain
+INC <expr> 7C 1 2 swap-bytes
+INCA - 4C 1 0 plain
+INCB - 5C 1 0 plain
+INS - 31 1 0 plain
+INX - 08 1 0 plain
+INY - 1808 2 0 plain class=4
+JMP <expr>,Y 186E 2 1 plain class=4
+JMP <expr>,X 6E 1 1 plain
+JMP <expr> 7E 1 2 swap-bytes
+JSR <expr>,Y 18AD 2 1 plain class=4
+JSR <expr>,X AD 1 1 plain
+JSR <expr> BD 1 2 zero-page-moto
+LDAA #<expr> 86 1 1 plain
+LDAA <expr>,Y 18A6 2 1 plain class=4
+LDAA <expr>,X A6 1 1 plain
+LDAA ><expr> B6 1 2 swap-bytes
+LDAA <expr> B6 1 2 zero-page-moto
+LDAB #<expr> C6 1 1 plain
+LDAB <expr>,Y 18E6 2 1 plain class=4
+LDAB <expr>,X E6 1 1 plain
+LDAB ><expr> F6 1 2 swap-bytes
+LDAB <expr> F6 1 2 zero-page-moto
+LDD #<expr> CC 1 2 swap-bytes class=2
+LDD <expr>,Y 18EC 2 1 plain class=4
+LDD <expr>,X EC 1 1 plain class=2
+LDD ><expr> FC 1 2 swap-bytes class=2
+LDD <expr> FC 1 2 zero-page-moto class=2
+LDS #<expr> 8E 1 2 swap-bytes
+LDS <expr>,Y 18AE 2 1 plain class=4
+LDS <expr>,X AE 1 1 plain
+LDS ><expr> BE 1 2 swap-bytes
+LDS <expr> BE 1 2 zero-page-moto
+LDX #<expr> CE 1 2 swap-bytes
+LDX <expr>,X EE 1 1 plain
+LDX <expr>,Y CDEE 2 1 plain class=4
+LDX ><expr> FE 1 2 swap-bytes
+LDX <expr> FE 1 2 zero-page-moto
+LDY #<expr> 18CE 2 2 swap-bytes class=4
+LDY <expr>,Y 18EE 2 1 plain class=4
+LDY <expr>,X 1AEE 2 1 plain class=4
+LDY ><expr> 18FE 2 2 swap-bytes class=4
+LDY <expr> 18FE 2 2 zero-page-moto class=4
+LSL <expr>,Y 1868 2 1 plain class=4
+LSL <expr>,X 68 1 1 plain
+LSL <expr> 78 1 2 swap-bytes
+LSLA - 48 1 0 plain
+LSLB - 58 1 0 plain
+LSLD - 05 1 0 plain class=2
+LSR <expr>,Y 1864 2 1 plain class=4
+LSR <expr>,X 64 1 1 plain
+LSR <expr> 74 1 2 swap-bytes
+LSRA - 44 1 0 plain
+LSRB - 54 1 0 plain
+LSRD - 04 1 0 plain class=2
+MUL - 3D 1 0 plain class=2
+NEG <expr>,Y 1860 2 1 plain class=4
+NEG <expr>,X 60 1 1 plain
+NEG <expr> 70 1 2 swap-bytes
+NEGA - 40 1 0 plain
+NEGB - 50 1 0 plain
+NOP - 01 1 0 plain
+ORAA #<expr> 8A 1 1 plain
+ORAA <expr>,Y 18AA 2 1 plain class=4
+ORAA <expr>,X AA 1 1 plain
+ORAA <expr> BA 1 2 zero-page-moto
+ORAB #<expr> CA 1 1 plain
+ORAB <expr>,Y 18EA 2 1 plain class=4
+ORAB <expr>,X EA 1 1 plain
+ORAB <expr> FA 1 2 zero-page-moto
+PSHA - 36 1 0 plain
+PSHB - 37 1 0 plain
+PSHX - 3C 1 0 plain class=2
+PSHY - 183C 2 0 plain class=4
+PULA - 32 1 0 plain
+PULB - 33 1 0 plain
+PULX - 38 1 0 plain class=2
+PULY - 1838 2 0 plain class=4
+ROL <expr>,Y 1869 2 1 plain class=4
+ROL <expr>,X 69 1 1 plain
+ROL <expr> 79 1 2 swap-bytes
+ROLA - 49 1 0 plain
+ROLB - 59 1 0 plain
+ROR <expr>,Y 1866 2 1 plain class=4
+ROR <expr>,X 66 1 1 plain
+ROR <expr> 76 1 2 swap-bytes
+RORA - 46 1 0 plain
+RORB - 56 1 0 plain
+RTI - 3B 1 0 plain
+RTS - 39 1 0 plain
+SBA - 10 1 0 plain
+SBCA #<expr> 82 1 1 plain
+SBCA <expr>,Y 18A2 2 1 plain class=4
+SBCA <expr>,X A2 1 1 plain
+SBCA <expr> B2 1 2 zero-page-moto
+SBCB #<expr> C2 1 1 plain
+SBCB <expr>,Y 18E2 2 1 plain class=4
+SBCB <expr>,X E2 1 1 plain
+SBCB <expr> F2 1 2 zero-page-moto
+SEC - 0D 1 0 plain
+SEI - 0F 1 0 plain
+SEV - 0B 1 0 plain
+STAA <expr>,Y 18A7 2 1 plain class=4
+STAA <expr>,X A7 1 1 plain
+STAA ><expr> B7 1 2 swap-bytes
+STAA <expr> B7 1 2 zero-page-moto
+STAB <expr>,Y 18E7 2 1 plain class=4
+STAB <expr>,X E7 1 1 plain
+STAB ><expr> F7 1 2 swap-bytes
+STAB <expr> F7 1 2 zero-page-moto
+STD <expr>,Y 18ED 2 1 plain class=4
+STD <expr>,X ED 1 1 plain class=2
+STD ><expr> FD 1 2 swap-bytes class=2
+STD <expr> FD 1 2 zero-page-moto class=2
+STOP - CF 1 0 plain
+STS <expr>,X AF 1 1 plain
+STS <expr>,Y 18AF 2 1 plain class=4
+STS ><expr> BF 1 2 swap-bytes
+STS <expr> BF 1 2 zero-page-moto
+STX <expr>,X EF 1 1 plain
+STX <expr>,Y CDEF 2 1 plain class=4
+STX ><expr> FF 1 2 swap-bytes
+STX <expr> FF 1 2 zero-page-moto
+STY <expr>,Y 18EF 2 1 plain class=4
+STY <expr>,X 1AEF 2 1 plain class=4
+STY ><expr> 18FF 2 2 swap-bytes class=4
+STY <expr> 18FF 2 2 zero-page-moto class=4
+SUBA #<expr> 80 1 1 plain
+SUBA <expr>,Y 18A0 2 1 plain class=4
+SUBA <expr>,X A0 1 1 plain
+SUBA <expr> B0 1 2 zero-page-moto
+SUBB #<expr> C0 1 1 plain
+SUBB <expr>,Y 18E0 2 1 plain class=4
+SUBB <expr>,X E0 1 1 plain
+SUBB <expr> F0 1 2 zero-page-moto
+SUBD #<expr> 83 1 2 swap-bytes class=2
+SUBD <expr>,Y 18A3 2 1 plain class=4
+SUBD <expr>,X A3 1 1 plain class=2
+SUBD <expr> B3 1 2 zero-page-moto class=2
+SWI - 3F 1 0 plain
+TAB - 16 1 0 plain
+TAP - 06 1 0 plain
+TBA - 17 1 0 plain
+TEST - 00 1 0 plain
+TPA - 07 1 0 plain
+TST <expr>,Y 186D 2 1 plain class=4
+TST <expr>,X 6D 1 1 plain
+TST <expr> 7D 1 2 swap-bytes
+TSTA - 4D 1 0 plain
+TSTB - 5D 1 0 plain
+TSX - 30 1 0 plain
+TSY - 1830 2 0 plain class=4
+TXS - 35 1 0 plain
+TYS - 1835 2 0 plain class=4
+WAI - 3E 1 0 plain
+XGDX - 8F 1 0 plain class=4
+XGDY - 188F 2 0 plain class=4

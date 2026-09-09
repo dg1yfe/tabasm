@@ -1,0 +1,62 @@
+0001   0000             ; Encoding rules that no shipped table selects (spec 07-encoding-rules.md 7.25).
+0002   0000             ; Assemble with -51: tasm51 declares .NOARGSHIFT and is LSFIRST, so an injected
+0003   0000             ; row behaves exactly as it would in its intended table. Each rule is added with
+0004   0000             ; .ADDINSTR and then exercised; the expected emission is in the comment.
+0005   0000             ;
+0006   0000             ; Verified byte-for-byte against the 2001 release binary (tasm.exe under wine).
+0007   0000             ; Documented in the notes and the manual 7.25.
+0008   0000                     .org 0
+0009   0000             
+0010   0000                     .addinstr TCN  *,*    90 2 CN 1
+0011   0000                     .addinstr TC5  *,*    91 2 C5 1
+0012   0000                     .addinstr T3A  *,*,*  92 4 3A 1
+0013   0000                     .addinstr TR3  *      A0 1 R3 1
+0014   0000                     .addinstr TZW  *,*    C4 3 ZW 1
+0015   0000                     .addinstr TZD  *,*    C6 2 ZD 1
+0016   0000                     .addinstr TZL  *,*    C8 2 ZL 1
+0017   0000                     .addinstr TSZ  *      C3 3 SZ 1
+0018   0000                     .addinstr TSB  *,*    10 2 SB 1
+0019   0000                     .addinstr TSB3 *,*,*  20 3 SB 1
+0020   0000                     .addinstr TT2  *,*    30 3 T2 1
+0021   0000                     .addinstr TT2A *      40 1 T2 1
+0022   0000                     .addinstr TT3  *,*    50 3 T3 1
+0023   0000                     .addinstr TT4  *,*    0000 2 T4 1
+0024   0000                     .addinstr TT6  *,*    60 1 T6 1 0 F0
+0025   0000             
+0026   0000                     TCN  3,5            ; CN  -> 90 53
+rules-unshipped.asm line 0026: unrecognized argument.             (3,5)
+0027   0000                     TC5  3,5            ; C5  -> 91 35
+rules-unshipped.asm line 0027: unrecognized argument.             (3,5)
+0028   0000                     T3A  11h,22h,33h    ; 3A  -> 92 11 22 33
+rules-unshipped.asm line 0028: unrecognized argument.             (11h,22h,33h)
+0029   0000                     TR3  $+3            ; R3  -> A2         delta 2, A0|2
+rules-unshipped.asm line 0029: unrecognized argument.             ($+3)
+0030   0000                     TZW  0E1h,0E2h      ; ZW  -> C2 12      both working regs: opcode C4->C2, one byte
+rules-unshipped.asm line 0030: unrecognized argument.             (0E1h,0E2h)
+0031   0000                     TZW  11h,22h        ; ZW  -> C4 22 11   not working regs: byte-swapped pair
+rules-unshipped.asm line 0031: unrecognized argument.             (11h,22h)
+0032   0000                     TZD  3,$+5          ; ZD  -> F6 03      opcode C6|(3<<4), delta 3
+rules-unshipped.asm line 0032: unrecognized argument.             (3,$+5)
+0033   0000                     TZL  55h,2          ; ZL  -> E8 55      opcode C8|(2<<4), immed 0x55
+rules-unshipped.asm line 0033: unrecognized argument.             (55h,2)
+0034   0000                     TSZ  44h            ; SZ  -> B3 44      zero page: C3->B3, one byte
+rules-unshipped.asm line 0034: unrecognized argument.             (44h)
+0035   0000                     TSZ  1234h          ; SZ  -> C3 12 34   not zero page: byte-swapped
+rules-unshipped.asm line 0035: unrecognized argument.             (1234h)
+0036   0000                     TSB  44h,3          ; SB  -> 16 44      opcode 10|(3<<1), addr 0x44
+rules-unshipped.asm line 0036: unrecognized argument.             (44h,3)
+0037   0000                     TSB3 44h,3,$+4      ; SB  -> 26 44 01   opcode 20|(3<<1), delta 1
+rules-unshipped.asm line 0037: unrecognized argument.             (44h,3,$+4)
+0038   0000                     TT2  1234h,7        ; T2  -> 37 12 34   opcode 30|7, const byte-swapped
+rules-unshipped.asm line 0038: unrecognized argument.             (1234h,7)
+0039   0000                     TT2A 5              ; T2  -> 45         opcode 40|5, one operand
+rules-unshipped.asm line 0039: unrecognized argument.             (5)
+0040   0000                     TT3  1,5678h        ; T3  -> 51 56 78   opcode 50|1, const byte-swapped
+rules-unshipped.asm line 0040: unrecognized argument.             (1,5678h)
+0041   0000                     TT4  1,2            ; T4  -> 81 00      opcode 1|(2<<6)=0x81, LSFIRST
+rules-unshipped.asm line 0041: unrecognized argument.             (1,2)
+0042   0000                     TT6  3,50h          ; T6  -> 73         opcode 60|3|50
+rules-unshipped.asm line 0042: unrecognized argument.             (3,50h)
+0043   0000             
+0044   0000                     .end
+tabasm: Number of errors = 17

@@ -1,0 +1,136 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+# One run per ref; a new push cancels the previous one.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  # The assembler must produce identical bytes everywhere. The golden suite
+  # compares against output recorded on one machine, so running it on three
+  # operating systems is a portability check, not just a build check.
+  test:
+    name: test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+
+      # Line endings are load-bearing here: one fixture must keep its CRLF and
+      # the recorded output must stay byte-exact. .gitattributes marks them
+      # binary, and a conformance test asserts the CRLF survived -- so a
+      # checkout that mangled them fails loudly rather than quietly.
+      - name: Show how git checked the fixtures out
+        shell: bash
+        run: |
+          echo "core.autocrlf = $(git config --get core.autocrlf || echo unset)"
+          printf 'CRLF fixture carriage returns: '
+          tr -cd '\r' < testing/cases/crlf-source.asm | wc -c
+
+      - name: Toolchain
+        shell: bash
+        run: rustup update --no-self-update stable && rustup default stable && rustc -Vv
+
+      - name: Test
+        run: cargo test --release --locked
+
+  # Arithmetic wraps by design in places and must be guarded everywhere else.
+  # This build traps what release silently wraps.
+  overflow:
+    name: overflow-checked build
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: -C overflow-checks=on -C debug-assertions=on
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update --no-self-update stable && rustup default stable
+      - run: cargo test --locked
+
+  lint:
+    name: format and lints
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update --no-self-update stable && rustup default stable
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --locked -- -D warnings
+
+  # Cargo.toml claims a minimum supported version; this is what keeps the claim
+  # honest.
+  msrv:
+    name: minimum supported Rust
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - shell: bash
+        run: |
+          msrv=$(grep '^rust-version' Cargo.toml | tr -d '" ' | cut -d= -f2)
+          echo "Cargo.toml declares $msrv"
+          rustup toolchain install "$msrv" --profile minimal --no-self-update
+          cargo "+$msrv" check --all-targets --locked
+
+  # The published tree must stand on its own. A checkout here is exactly what a
+  # user gets, so this asserts nothing withheld from the branch is needed, and
+  # that the binary runs outside the test harness.
+  standalone:
+    name: published tree stands alone
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup update --no-self-update stable && rustup default stable
+      - name: Build and assemble every target
+        shell: bash
+        # Driven the way README tells a reader to drive it: TASMTABS naming the
+        # table directory, and --cpu taking its value as a separate argument.
+        # The spelling is deliberate -- README uses the separated form
+        # throughout, and the parser once accepted only --cpu=<name>, so every
+        # printed invocation failed while a CI job written with '=' passed.
+        run: |
+          cargo build --release --locked
+          fail=0
+          for t in tables/*.tab2; do
+            cpu=$(basename "$t" .tab2)
+            if TASMTABS=tables ./target/release/tabasm --cpu "$cpu" -x \
+                 "testing/smoke/$cpu.asm" /tmp/o.obj /tmp/o.lst > /tmp/o.out 2>&1 \
+               && ! grep -q 'unrecognized option' /tmp/o.out; then
+              echo "ok    $cpu"
+            else
+              echo "FAIL  $cpu"; cat /tmp/o.out; fail=1
+            fi
+          done
+          exit $fail
+
+      - name: Every invocation README prints
+        shell: bash
+        # A warning is not an error here: an unrecognized option leaves the
+        # exit status at 0, so the output has to be inspected. Documentation
+        # that does not run is worse than no documentation.
+        run: |
+          fail=0
+          check() {
+            if TASMTABS=tables "$@" > /tmp/r.out 2>&1 \
+               && ! grep -q 'unrecognized option\|needs a value' /tmp/r.out; then
+              echo "ok    $*"
+            else
+              echo "FAIL  $*"; cat /tmp/r.out; fail=1
+            fi
+          }
+          cp testing/smoke/z80.asm firmware.asm
+          cp testing/smoke/8051.asm x.asm
+          check ./target/release/tabasm --cpu z80 -g2 firmware.asm firmware.s19
+          check ./target/release/tabasm --compatibility --bug-compatibility \
+                --message-prefix tasm --cpu 8051 x.asm
+          exit $fail

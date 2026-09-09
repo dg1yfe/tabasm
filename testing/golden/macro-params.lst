@@ -1,0 +1,19 @@
+0001   0000             ; Macro parameter references (spec 04-directives.md 4.7). A parameterised macro
+0002   0000             ; body refers to its parameters two ways, and both work:
+0003   0000             ;   - by the parameter's NAME, which .DEFINE rewrites to the internal token ?n;
+0004   0000             ;   - by that ?n token directly (n = the 0-based parameter index).
+0005   0000             ; At each call the ?n are spliced with the call arguments. Substitution is by
+0006   0000             ; WHOLE IDENTIFIER: a parameter name is not replaced inside a longer token, so
+0007   0000             ; a parameter A leaves the A inside 0Ah alone. Verified byte-for-byte against
+0008   0000             ; the 2001 release binary. Documented in the notes.
+0009   0000                     .org 0
+0010   0000             #define BYNAME(x,y)  .byte x,y
+0011   0000             #define BYINDEX(a,b) .byte ?0,?1
+0012   0000             #define DUP(v)       .byte v,v,v
+0013   0000             #define WHOLEID(A)   .byte A,0Ah
+0014   0000 AA BB               BYNAME(0AAh,0BBh)   ; by name        -> AA BB
+0015   0002 CC DD               BYINDEX(0CCh,0DDh)  ; by ?n index    -> CC DD
+0016   0004 07 07 07            DUP(7)              ; repeated use   -> 07 07 07
+0017   0007 03 0A               WHOLEID(3)          ; A in 0Ah kept  -> 03 0A
+0018   0009                     .end
+tabasm: Number of errors = 0

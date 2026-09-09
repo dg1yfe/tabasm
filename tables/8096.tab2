@@ -1,0 +1,296 @@
+%format         2
+%banner         "Table-driven 8096 Assembler"
+%opcode-order   ms-first
+%address-unit   byte
+%aux-registers  2
+%columns        mnemonic operands opcode op-bytes arg-bytes rule
+ADD <expr>,<expr>,[<expr>]+ 46 1 3 i8096-combine field-mask=FEFEFE set-bits=1
+ADD <expr>,<expr>,[<expr>] 46 1 3 i8096-combine field-mask=FEFEFE
+ADD <expr>,<expr>,<expr>[<expr>] 47 1 5 i8096-indexed field-mask=FEFEFE
+ADD <expr>,<expr>,#<expr> 45 1 4 i8096-combine field-mask=FEFEFFFF
+ADD <expr>,[<expr>]+ 66 1 2 i8096-combine field-mask=FFFE set-bits=1
+ADD <expr>,[<expr>] 66 1 2 i8096-combine field-mask=FFFE
+ADD <expr>,<expr>[<expr>] 67 1 4 i8096-indexed field-mask=FFFFFF
+ADD <expr>,<expr>,<expr> 4701 2 4 i8096-short-long-3 field-mask=FEFE
+ADD <expr>,#<expr> 65 1 3 i8096-combine field-mask=FEFFFF
+ADD <expr>,<expr> 6701 2 3 i8096-short-long-2 field-mask=FEFE
+ADDB <expr>,<expr>,[<expr>]+ 56 1 3 i8096-combine set-bits=1
+ADDB <expr>,<expr>,[<expr>] 56 1 3 i8096-combine
+ADDB <expr>,<expr>,<expr>[<expr>] 57 1 5 i8096-indexed
+ADDB <expr>,<expr>,#<expr> 55 1 3 i8096-combine
+ADDB <expr>,[<expr>]+ 76 1 2 i8096-combine field-mask=FFFE set-bits=1
+ADDB <expr>,[<expr>] 76 1 2 i8096-combine field-mask=FFFE
+ADDB <expr>,<expr>[<expr>] 77 1 4 i8096-indexed field-mask=FEFFFE
+ADDB <expr>,<expr>,<expr> 5701 2 4 i8096-short-long-3
+ADDB <expr>,#<expr> 75 1 2 i8096-combine field-mask=FFFFFF
+ADDB <expr>,<expr> 7701 2 3 i8096-short-long-2
+ADDC <expr>,[<expr>]+ A6 1 2 i8096-combine field-mask=FFFE set-bits=1
+ADDC <expr>,[<expr>] A6 1 2 i8096-combine field-mask=FFFE
+ADDC <expr>,<expr>[<expr>] A7 1 4 i8096-indexed field-mask=FFFFFF
+ADDC <expr>,#<expr> A5 1 3 i8096-combine field-mask=FEFFFF
+ADDC <expr>,<expr> A701 2 3 i8096-short-long-2
+ADDCB <expr>,[<expr>]+ B6 1 2 i8096-combine field-mask=FFFE set-bits=1
+ADDCB <expr>,[<expr>] B6 1 2 i8096-combine field-mask=FFFE
+ADDCB <expr>,<expr>[<expr>] B7 1 4 i8096-indexed field-mask=FFFFFF
+ADDCB <expr>,#<expr> B5 1 2 i8096-combine field-mask=FFFFFF
+ADDCB <expr>,<expr> B701 2 3 i8096-short-long-2
+AND <expr>,<expr>,[<expr>]+ 42 1 3 i8096-combine set-bits=1
+AND <expr>,<expr>,[<expr>] 42 1 3 i8096-combine
+AND <expr>,<expr>,<expr>[<expr>] 43 1 5 i8096-indexed
+AND <expr>,<expr>,#<expr> 41 1 4 i8096-combine
+AND <expr>,[<expr>]+ 62 1 2 i8096-combine field-mask=FFFE set-bits=1
+AND <expr>,[<expr>] 62 1 2 i8096-combine field-mask=FFFE
+AND <expr>,<expr>[<expr>] 63 1 4 i8096-indexed field-mask=FEFFFE
+AND <expr>,<expr>,<expr> 4301 2 4 i8096-short-long-3
+AND <expr>,#<expr> 61 1 3 i8096-combine field-mask=FEFFFF
+AND <expr>,<expr> 6301 2 3 i8096-short-long-2
+ANDB <expr>,<expr>,[<expr>]+ 52 1 3 i8096-combine set-bits=1
+ANDB <expr>,<expr>,[<expr>] 52 1 3 i8096-combine
+ANDB <expr>,<expr>,<expr>[<expr>] 53 1 5 i8096-indexed
+ANDB <expr>,<expr>,#<expr> 51 1 3 i8096-combine
+ANDB <expr>,[<expr>]+ 72 1 2 i8096-combine field-mask=FFFE set-bits=1
+ANDB <expr>,[<expr>] 72 1 2 i8096-combine field-mask=FFFE
+ANDB <expr>,<expr>[<expr>] 73 1 4 i8096-indexed field-mask=FFFFFF
+ANDB <expr>,<expr>,<expr> 5301 2 4 i8096-short-long-3
+ANDB <expr>,#<expr> 71 1 2 i8096-combine field-mask=FFFFFF
+ANDB <expr>,<expr> 7301 2 3 i8096-short-long-2
+BMOV <expr>,<expr> C1 1 2 i8096-combine class=2 field-mask=FCFF
+BMOVI <expr>,<expr> AD 1 2 i8096-combine class=2 field-mask=FCFF
+BR [<expr>] E3 1 1 i8096-combine
+BR <expr> 2000 2 0 i8096-rel11
+CLR <expr> 01 1 1 plain
+CLRB <expr> 11 1 1 plain
+CLRC - F8 1 0 plain
+CLRVT - FC 1 0 plain
+CMP <expr>,[<expr>]+ 8A 1 2 i8096-combine field-mask=FFFE set-bits=1
+CMP <expr>,[<expr>] 8A 1 2 i8096-combine field-mask=FFFE
+CMP <expr>,<expr>[<expr>] 8B 1 4 i8096-indexed field-mask=FFFFFF
+CMP <expr>,#<expr> 89 1 3 i8096-combine field-mask=FEFFFF
+CMP <expr>,<expr> 8B01 2 3 i8096-short-long-2
+CMPB <expr>,[<expr>]+ 9A 1 2 i8096-combine field-mask=FFFE set-bits=1
+CMPB <expr>,[<expr>] 9A 1 2 i8096-combine field-mask=FFFE
+CMPB <expr>,<expr>[<expr>] 9B 1 4 i8096-indexed field-mask=FFFFFF
+CMPB <expr>,#<expr> 99 1 2 i8096-combine field-mask=FFFFFF
+CMPB <expr>,<expr> 9B01 2 3 i8096-short-long-2
+CMPL <expr>,<expr> C5 1 2 i8096-combine class=2 field-mask=FCFC
+DEC <expr> 05 1 1 plain
+DECB <expr> 15 1 1 plain
+DJNZ <expr>,<expr> E0 1 2 combine-rel
+DJNZW <expr>,<expr> E1 1 2 combine-rel class=2
+DI - FA 1 0 plain
+DIVU <expr>,[<expr>]+ 8E 1 2 i8096-combine field-mask=FFFE set-bits=1
+DIVU <expr>,[<expr>] 8E 1 2 i8096-combine field-mask=FFFE
+DIVU <expr>,<expr>[<expr>] 8F 1 4 i8096-indexed field-mask=FFFE
+DIVU <expr>,#<expr> 8D 1 3 i8096-combine field-mask=FEFFFF
+DIVU <expr>,<expr> 8F01 2 3 i8096-short-long-2
+DIVUB <expr>,[<expr>]+ 9E 1 2 i8096-combine field-mask=FFFE set-bits=1
+DIVUB <expr>,[<expr>] 9E 1 2 i8096-combine field-mask=FFFE
+DIVUB <expr>,<expr>[<expr>] 9F 1 4 i8096-indexed field-mask=FFFF
+DIVUB <expr>,#<expr> 9D 1 2 i8096-combine field-mask=FFFFFF
+DIVUB <expr>,<expr> 9F01 2 3 i8096-short-long-2
+DIV <expr>,[<expr>]+ FE8E 2 2 i8096-combine field-mask=FFFE set-bits=1
+DIV <expr>,[<expr>] FE8E 2 2 i8096-combine field-mask=FFFE
+DIV <expr>,<expr>[<expr>] FE8F 2 4 i8096-indexed field-mask=FFFE
+DIV <expr>,#<expr> FE8D 2 3 i8096-combine field-mask=FEFFFF
+DIV <expr>,<expr> FE8F01 3 3 i8096-short-long-2
+DIVB <expr>,[<expr>]+ FE9E 2 2 i8096-combine field-mask=FFFE set-bits=1
+DIVB <expr>,[<expr>] FE9E 2 2 i8096-combine field-mask=FFFE
+DIVB <expr>,<expr>[<expr>] FE9F 2 4 i8096-indexed field-mask=FFFF
+DIVB <expr>,#<expr> FE9D 2 2 i8096-combine field-mask=FFFFFF
+DIVB <expr>,<expr> FE9F01 3 3 i8096-short-long-2
+DPTS - EC 1 0 plain class=2
+EPTS - ED 1 0 plain class=2
+EI - FB 1 0 plain
+EXT <expr> 06 1 1 plain
+EXTB <expr> 16 1 1 plain
+IDLPD #<expr> F6 1 1 plain class=2
+INC <expr> 07 1 1 plain
+INCB <expr> 17 1 1 plain
+JC <expr> DB 1 1 rel8
+JNC <expr> D3 1 1 rel8
+JH <expr> D9 1 1 rel8
+JNH <expr> D1 1 1 rel8
+JE <expr> DF 1 1 rel8
+JNE <expr> D7 1 1 rel8
+JV <expr> DD 1 1 rel8
+JNV <expr> D5 1 1 rel8
+JGE <expr> D6 1 1 rel8
+JLT <expr> DE 1 1 rel8
+JVT <expr> DC 1 1 rel8
+JNVT <expr> D4 1 1 rel8
+JGT <expr> D2 1 1 rel8
+JLE <expr> DA 1 1 rel8
+JST <expr> D8 1 1 rel8
+JNST <expr> D0 1 1 rel8
+JBC <expr>,<expr>,<expr> 30 1 2 i8096-jump-bit
+JBS <expr>,<expr>,<expr> 38 1 2 i8096-jump-bit
+LJMP <expr> E7 1 2 rel16
+LCALL <expr> EF 1 2 rel16
+LD <expr>,[<expr>]+ A2 1 2 i8096-combine field-mask=FFFE set-bits=1
+LD <expr>,[<expr>] A2 1 2 i8096-combine field-mask=FFFE
+LD <expr>,<expr>[<expr>] A3 1 4 i8096-indexed field-mask=FFFFFF
+LD <expr>,#<expr> A1 1 3 i8096-combine field-mask=FFFFFF
+LD <expr>,<expr> A301 2 3 i8096-short-long-2
+LDB <expr>,[<expr>]+ B2 1 2 i8096-combine field-mask=FFFE set-bits=1
+LDB <expr>,[<expr>] B2 1 2 i8096-combine field-mask=FFFE
+LDB <expr>,<expr>[<expr>] B3 1 4 i8096-indexed field-mask=FFFFFF
+LDB <expr>,#<expr> B1 1 2 i8096-combine field-mask=FFFFFF
+LDB <expr>,<expr> B301 2 3 i8096-short-long-2
+LDBSE <expr>,[<expr>]+ BE 1 2 i8096-combine field-mask=FFFE set-bits=1
+LDBSE <expr>,[<expr>] BE 1 2 i8096-combine field-mask=FFFE
+LDBSE <expr>,<expr>[<expr>] BF 1 4 i8096-indexed field-mask=FEFFFE
+LDBSE <expr>,#<expr> BD 1 2 i8096-combine field-mask=FFFFFF
+LDBSE <expr>,<expr> BF01 2 3 i8096-short-long-2
+LDBZE <expr>,[<expr>]+ AE 1 2 i8096-combine field-mask=FFFE set-bits=1
+LDBZE <expr>,[<expr>] AE 1 2 i8096-combine field-mask=FFFE
+LDBZE <expr>,<expr>[<expr>] AF 1 4 i8096-indexed field-mask=FEFFFE
+LDBZE <expr>,#<expr> AD 1 2 i8096-combine field-mask=FFFFFF
+LDBZE <expr>,<expr> AF01 2 3 i8096-short-long-2
+MULU <expr>,<expr>,[<expr>]+ 4E 1 3 i8096-combine set-bits=1
+MULU <expr>,<expr>,[<expr>] 4E 1 3 i8096-combine
+MULU <expr>,<expr>,<expr>[<expr>] 4F 1 5 i8096-indexed
+MULU <expr>,<expr>,#<expr> 4D 1 4 i8096-combine
+MULU <expr>,[<expr>]+ 6E 1 2 i8096-combine field-mask=FFFE set-bits=1
+MULU <expr>,[<expr>] 6E 1 2 i8096-combine field-mask=FFFE
+MULU <expr>,<expr>[<expr>] 6F 1 4 i8096-indexed field-mask=FEFFFE
+MULU <expr>,<expr>,<expr> 4F01 2 4 i8096-short-long-3
+MULU <expr>,#<expr> 6D 1 3 i8096-combine field-mask=FEFFFF
+MULU <expr>,<expr> 6F01 2 3 i8096-short-long-2
+MULUB <expr>,<expr>,[<expr>]+ 5E 1 3 i8096-combine set-bits=1
+MULUB <expr>,<expr>,[<expr>] 5E 1 3 i8096-combine
+MULUB <expr>,<expr>,<expr>[<expr>] 5F 1 5 i8096-indexed
+MULUB <expr>,<expr>,#<expr> 5D 1 3 i8096-combine
+MULUB <expr>,[<expr>]+ 7E 1 2 i8096-combine field-mask=FFFE set-bits=1
+MULUB <expr>,[<expr>] 7E 1 2 i8096-combine field-mask=FFFE
+MULUB <expr>,<expr>[<expr>] 7F 1 4 i8096-indexed field-mask=FFFFFF
+MULUB <expr>,<expr>,<expr> 5F01 2 4 i8096-short-long-3
+MULUB <expr>,#<expr> 7D 1 2 i8096-combine field-mask=FFFFFF
+MULUB <expr>,<expr> 7F01 2 3 i8096-short-long-2
+MUL <expr>,<expr>,[<expr>]+ FE4E 2 3 i8096-combine set-bits=1
+MUL <expr>,<expr>,[<expr>] FE4E 2 3 i8096-combine
+MUL <expr>,<expr>,<expr>[<expr>] FE4F 2 5 i8096-indexed
+MUL <expr>,<expr>,#<expr> FE4D 2 4 i8096-combine
+MUL <expr>,[<expr>]+ FE6E 2 2 i8096-combine field-mask=FFFE set-bits=1
+MUL <expr>,[<expr>] FE6E 2 2 i8096-combine field-mask=FFFE
+MUL <expr>,<expr>[<expr>] FE6F 2 4 i8096-indexed field-mask=FEFFFE
+MUL <expr>,<expr>,<expr> FE4F01 3 4 i8096-short-long-3
+MUL <expr>,#<expr> FE6D 2 3 i8096-combine field-mask=FFFFFF
+MUL <expr>,<expr> FE6F01 3 3 i8096-short-long-2
+MULB <expr>,<expr>,[<expr>]+ FE5E 2 3 i8096-combine set-bits=1
+MULB <expr>,<expr>,[<expr>] FE5E 2 3 i8096-combine
+MULB <expr>,<expr>,<expr>[<expr>] FE5F 2 5 i8096-indexed
+MULB <expr>,<expr>,#<expr> FE5D 2 3 i8096-combine
+MULB <expr>,[<expr>]+ FE7E 2 2 i8096-combine field-mask=FFFE set-bits=1
+MULB <expr>,[<expr>] FE7E 2 2 i8096-combine field-mask=FFFE
+MULB <expr>,<expr>[<expr>] FE7F 2 4 i8096-indexed field-mask=FFFFFF
+MULB <expr>,<expr>,<expr> FE5F01 3 4 i8096-short-long-3
+MULB <expr>,#<expr> FE7D 2 2 i8096-combine field-mask=FFFFFF
+MULB <expr>,<expr> FE7F01 3 3 i8096-short-long-2
+NEG <expr> 03 1 1 i8096-combine field-mask=FE
+NEGB <expr> 13 1 1 i8096-combine field-mask=FF
+NOP - FD 1 0 plain
+NORML <expr>,<expr> 0F 1 2 i8096-combine field-mask=FFFF
+NOT <expr> 02 1 1 plain
+NOTB <expr> 12 1 1 plain
+OR <expr>,[<expr>]+ 82 1 2 i8096-combine field-mask=FFFE set-bits=1
+OR <expr>,[<expr>] 82 1 2 i8096-combine field-mask=FFFE
+OR <expr>,<expr>[<expr>] 83 1 4 i8096-indexed field-mask=FEFFFE
+OR <expr>,#<expr> 81 1 3 i8096-combine field-mask=FEFFFF
+OR <expr>,<expr> 8301 2 3 i8096-short-long-2
+ORB <expr>,[<expr>]+ 92 1 2 i8096-combine field-mask=FFFE set-bits=1
+ORB <expr>,[<expr>] 92 1 2 i8096-combine field-mask=FFFE
+ORB <expr>,<expr>[<expr>] 93 1 4 i8096-indexed field-mask=FFFFFF
+ORB <expr>,#<expr> 91 1 2 i8096-combine field-mask=FFFFFF
+ORB <expr>,<expr> 9301 2 3 i8096-short-long-2
+PUSH #<expr> C9 1 2 i8096-combine
+PUSH [<expr>]+ CA 1 1 i8096-combine field-mask=FE set-bits=1
+PUSH [<expr>] CA 1 1 i8096-combine field-mask=FE
+PUSH <expr>[<expr>] CB 1 3 i8096-indexed field-mask=FFFFFE
+PUSH <expr> CB01 2 2 i8096-short-long-1 field-mask=FFFE
+PUSHF - F2 1 0 plain
+PUSHA - F4 1 0 plain
+POP [<expr>]+ CE 1 1 i8096-combine field-mask=FE set-bits=1
+POP [<expr>] CE 1 1 i8096-combine field-mask=FE
+POP <expr>[<expr>] CF 1 3 i8096-indexed field-mask=FFFFFE
+POP <expr> CF01 2 2 i8096-short-long-1 field-mask=FFFE
+POPF - F3 1 0 plain
+POPA - F5 1 0 plain
+RET - F0 1 0 plain
+RST - FF 1 0 plain
+SJMP <expr> 2000 2 0 i8096-rel11
+SCALL <expr> 2800 2 0 i8096-rel11
+SUB <expr>,<expr>,[<expr>]+ 4A 1 3 i8096-combine set-bits=1
+SUB <expr>,<expr>,[<expr>] 4A 1 3 i8096-combine
+SUB <expr>,<expr>,<expr>[<expr>] 4B 1 5 i8096-indexed
+SUB <expr>,<expr>,#<expr> 49 1 4 i8096-combine
+SUB <expr>,[<expr>]+ 6A 1 2 i8096-combine field-mask=FFFE set-bits=1
+SUB <expr>,[<expr>] 6A 1 2 i8096-combine field-mask=FFFE
+SUB <expr>,<expr>[<expr>] 6B 1 4 i8096-indexed field-mask=FEFFFE
+SUB <expr>,<expr>,<expr> 4B01 2 4 i8096-short-long-3
+SUB <expr>,#<expr> 69 1 3 i8096-combine field-mask=FEFFFF
+SUB <expr>,<expr> 6B01 2 3 i8096-short-long-2
+SUBB <expr>,<expr>,[<expr>]+ 5A 1 3 i8096-combine set-bits=1
+SUBB <expr>,<expr>,[<expr>] 5A 1 3 i8096-combine
+SUBB <expr>,<expr>,<expr>[<expr>] 5B 1 5 i8096-indexed
+SUBB <expr>,<expr>,#<expr> 59 1 3 i8096-combine
+SUBB <expr>,[<expr>]+ 7A 1 2 i8096-combine field-mask=FFFE set-bits=1
+SUBB <expr>,[<expr>] 7A 1 2 i8096-combine field-mask=FFFE
+SUBB <expr>,<expr>[<expr>] 7B 1 4 i8096-indexed field-mask=FEFFFE
+SUBB <expr>,<expr>,<expr> 5B01 2 4 i8096-short-long-3
+SUBB <expr>,#<expr> 79 1 2 i8096-combine field-mask=FFFFFF
+SUBB <expr>,<expr> 7B01 2 3 i8096-short-long-2
+SUBC <expr>,[<expr>]+ AA 1 2 i8096-combine field-mask=FFFE set-bits=1
+SUBC <expr>,[<expr>] AA 1 2 i8096-combine field-mask=FFFE
+SUBC <expr>,<expr>[<expr>] AB 1 4 i8096-indexed field-mask=FEFFFE
+SUBC <expr>,#<expr> A9 1 3 i8096-combine field-mask=FEFFFF
+SUBC <expr>,<expr> AB01 2 3 i8096-short-long-2
+SUBCB <expr>,[<expr>]+ BA 1 2 i8096-combine field-mask=FFFE set-bits=1
+SUBCB <expr>,[<expr>] BA 1 2 i8096-combine field-mask=FFFE
+SUBCB <expr>,<expr>[<expr>] BB 1 4 i8096-indexed field-mask=FEFFFE
+SUBCB <expr>,#<expr> B9 1 2 i8096-combine field-mask=FFFFFF
+SUBCB <expr>,<expr> BB01 2 3 i8096-short-long-2
+SHL <expr>,#<expr> 09 1 2 i8096-combine field-mask=FE0F
+SHL <expr>,<expr> 09 1 2 i8096-combine field-mask=FEFF
+SHLB <expr>,#<expr> 19 1 2 i8096-combine field-mask=FF0F
+SHLB <expr>,<expr> 19 1 2 i8096-combine field-mask=FFFF
+SHLL <expr>,#<expr> 0D 1 2 i8096-combine field-mask=FF0F
+SHLL <expr>,<expr> 0D 1 2 i8096-combine field-mask=FFFF
+SHR <expr>,#<expr> 08 1 2 i8096-combine field-mask=FF0F
+SHR <expr>,<expr> 08 1 2 i8096-combine field-mask=FFFF
+SHRB <expr>,#<expr> 18 1 2 i8096-combine field-mask=FF0F
+SHRB <expr>,<expr> 18 1 2 i8096-combine field-mask=FFFF
+SHRL <expr>,#<expr> 0C 1 2 i8096-combine field-mask=FF0F
+SHRL <expr>,<expr> 0C 1 2 i8096-combine field-mask=FFFF
+SHRA <expr>,#<expr> 0A 1 2 i8096-combine field-mask=FF0F
+SHRA <expr>,<expr> 0A 1 2 i8096-combine field-mask=FFFF
+SHRAB <expr>,#<expr> 1A 1 2 i8096-combine field-mask=FF0F
+SHRAB <expr>,<expr> 1A 1 2 i8096-combine field-mask=FFFF
+SHRAL <expr>,#<expr> 0E 1 2 i8096-combine field-mask=FF0F
+SHRAL <expr>,<expr> 0E 1 2 i8096-combine field-mask=FFFF
+SETC - F9 1 0 plain
+SKIP - 0000 2 0 plain
+SKIP <expr> 00 1 1 i8096-combine
+ST <expr>,[<expr>]+ C2 1 2 i8096-combine field-mask=FFFE set-bits=1
+ST <expr>,[<expr>] C2 1 2 i8096-combine field-mask=FFFE
+ST <expr>,<expr>[<expr>] C3 1 4 i8096-indexed field-mask=FFFFFFFE
+ST <expr>,<expr> C301 2 3 i8096-short-long-2
+STB <expr>,[<expr>]+ C6 1 2 i8096-combine field-mask=FFFE set-bits=1
+STB <expr>,[<expr>] C6 1 2 i8096-combine field-mask=FFFE
+STB <expr>,<expr>[<expr>] C7 1 4 i8096-indexed field-mask=FFFFFFFE
+STB <expr>,<expr> C701 2 3 i8096-short-long-2
+TRAP - F7 1 0 plain
+TIJMP <expr>,[<expr>],#<expr> E2 1 3 i8096-combine-swapped class=2 field-mask=FEFEFF
+XCH <expr>,<expr>[<expr>] 0B 1 4 i8096-indexed class=2 field-mask=FEFFFE
+XCH <expr>,<expr> 0B01 2 3 i8096-short-long-2 class=2 opcode-xor=C
+XCHB <expr>,<expr>[<expr>] 1B 1 4 i8096-indexed class=2 field-mask=FFFFFF
+XCHB <expr>,<expr> 1B01 2 3 i8096-short-long-2 class=2 opcode-xor=C
+XOR <expr>,[<expr>]+ 86 1 2 i8096-combine field-mask=FFFE set-bits=1
+XOR <expr>,[<expr>] 86 1 2 i8096-combine field-mask=FFFE
+XOR <expr>,<expr>[<expr>] 87 1 4 i8096-indexed field-mask=FEFFFE
+XOR <expr>,#<expr> 85 1 3 i8096-combine field-mask=FEFFFF
+XOR <expr>,<expr> 8701 2 3 i8096-short-long-2
+XORB <expr>,[<expr>]+ 96 1 2 i8096-combine field-mask=FFFE set-bits=1
+XORB <expr>,[<expr>] 96 1 2 i8096-combine field-mask=FFFE
+XORB <expr>,<expr>[<expr>] 97 1 4 i8096-indexed field-mask=FFFFFF
+XORB <expr>,#<expr> 95 1 2 i8096-combine field-mask=FFFFFF
+XORB <expr>,<expr> 9701 2 3 i8096-short-long-2

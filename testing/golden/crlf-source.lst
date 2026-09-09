@@ -1,0 +1,33 @@
+0001   0000             ; CRLF line endings. Assemble with -51.
+0002   0000             ;
+0003   0000             ; THIS FILE HAS CRLF LINE ENDINGS ON PURPOSE. If your editor or git normalises
+0004   0000             ; it to LF, the case stops testing anything. A .gitattributes rule marks it
+0005   0000             ; -text to prevent that.
+0006   0000             ;
+0007   0000             ; DOS-era assembly source has CRLF endings -- the original TASM distribution's
+0008   0000             ; own examples included -- and this assembler's natural corpus is exactly that.
+0009   0000             ; The Windows build never had to think about it, because its C runtime strips
+0010   0000             ; CR when reading a text file. On a Unix host that translation does not happen,
+0011   0000             ; so the CR survived into the line buffer and was absorbed into whichever token
+0012   0000             ; ended the line: ".END" became ".END\r" and matched no directive, "0" became
+0013   0000             ; "0\r" and was not a number.
+0014   0000             ;
+0015   0000             ; The CR is now stripped at the read, reproducing what the Windows runtime did.
+0016   0000             ;
+0017   0000             ; Every construct below has its last token at end of line, which is where the
+0018   0000             ; CR lands.
+0019   0000             ;
+0020   0000             ; A source file written on Windows must assemble to the same bytes as the
+0021   0000             ; same file written on Unix. That is what this case pins.
+0022   0000                     .org 0
+0023   0000             
+0024   0000 00          start:  nop
+0025   0001 74 05               mov  a,#5
+0026   0003 01 02 03            .byte 1,2,3
+0027   0006 34 12               .word 1234h
+0028   0008 63 72 6C 66         .text "crlf"
+0029   000C             value   .equ 42
+0030   000C 74 2A               mov  a,#value
+0031   000E 80 F0               sjmp start
+0032   0010                     .end
+tabasm: Number of errors = 0

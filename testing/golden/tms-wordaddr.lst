@@ -1,0 +1,28 @@
+0001   0000             ; Word addressing, from the .WORDADDRS table directive.
+0002   0000             ; Assemble with -3210.
+0003   0000             ;
+0004   0000             ; The program counter counts 16-bit words rather than bytes, so:
+0005   0000             ;
+0006   0000             ;   byte address = pc * 2
+0007   0000             ;   advance(n)   = (n + 1) / 2      rounded UP
+0008   0000             ;
+0009   0000             ; An odd byte count therefore still advances a whole word, and $ and * yield
+0010   0000             ; word addresses. The memory image is still indexed in bytes underneath.
+0011   0000             ;
+0012   0000                     .org  0
+0013   0000             
+0014   0000 01 02       two     .byte 1,2               ; 2 bytes -> advances 1 word
+0015   0001 03          one     .byte 3                 ; 1 byte  -> still advances 1 word (rounds up)
+0016   0002 21 43       word    .word 04321h            ; 2 bytes -> 1 word
+0017   0003 04 05 06    three   .byte 4,5,6             ; 3 bytes -> advances 2 words (rounds up)
+0018   0005             after
+0019   0005             
+0020   0005             ; The counter is a word address, so these record words not bytes.
+0021   0005 00 00               .word two               ; 0000
+0022   0006 01 00               .word one               ; 0001
+0023   0007 02 00               .word word              ; 0002
+0024   0008 03 00               .word three             ; 0003
+0025   0009 05 00               .word after             ; 0005 -- three bytes rounded up to two words
+0026   000A             
+0027   000A                     .end
+tabasm: Number of errors = 0
