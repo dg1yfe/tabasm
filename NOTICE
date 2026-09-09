@@ -1,0 +1,32 @@
+tabasm
+Copyright (c) 2026, Felix Erckenbrecht
+
+This product is licensed under the BSD 3-Clause License; see LICENSE.
+
+On the instruction tables
+-------------------------
+
+`tables/*.tab2` map each processor's mnemonics and addressing modes to the bytes
+it encodes. Those encodings are facts about the target processors, published in
+the manufacturers' own data sheets: `ADD A,R0 = 0x28` on an 8051 is not anyone's
+creative work, and stating it is not copying anyone's expression of it.
+
+The tables were mechanically converted from the format used by TASM, whose
+tables may be freely copied and used as input. The conversion carries over only
+the structural data — mnemonic, operand pattern, opcode, byte counts, encoding
+rule and class — and discards every line of commentary, so no upstream revision
+header, authorship credit or prose survives in them. `tab1to2` performs the
+conversion and is included, so anyone can repeat it and see what it does and does
+not keep.
+
+The result is that the BSD licence above applies cleanly to the whole of this
+repository. There is no third-party material here held under other terms.
+
+On compatibility with TASM
+--------------------------
+
+tabasm is an independent implementation, written from a behavioural
+specification rather than from TASM's source, which its authors have not read.
+It aims to be output-compatible with TASM, and names it for that reason. TASM is
+the work of its own authors; this project claims no association with them or
+with their trade names.
