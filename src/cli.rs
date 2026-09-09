@@ -126,6 +126,10 @@ pub struct Parsed {
     pub warnings: Vec<String>,
 }
 
+/// The long options that take a value, in either spelling. Kept as one list so
+/// that adding an option cannot leave the two spellings out of step.
+const LONG_WITH_VALUE: [&str; 3] = ["cpu", "message-prefix", "page-title"];
+
 impl Options {
     /// 1.1: options and file names may be interleaved. An argument beginning
     /// with '-' is an option; anything else is the next positional file name.
@@ -139,8 +143,33 @@ impl Options {
             args.extend(extra.split_whitespace().map(|s| s.to_string()));
         }
 
-        for arg in &args {
+        let mut i = 0;
+        while i < args.len() {
+            let arg = args[i].clone();
             if let Some(body) = arg.strip_prefix('-') {
+                // A long option that takes a value may be written either way:
+                // `--cpu=z80` or `--cpu z80`. Only this loop can see the next
+                // argument, so the separated form is joined here and handed on
+                // as though it had been written with the '='.
+                if let Some(name) = body.strip_prefix('-') {
+                    if !name.contains('=') && LONG_WITH_VALUE.contains(&name) {
+                        match args.get(i + 1) {
+                            // Consumed whatever it is, as getopt would. A value
+                            // may legitimately begin with '-': a page title, for
+                            // one.
+                            Some(value) => {
+                                o.option(&format!("-{}={}", name, value), &mut warnings);
+                                i += 2;
+                                continue;
+                            }
+                            None => {
+                                warnings.push(format!("option --{} needs a value", name));
+                                i += 1;
+                                continue;
+                            }
+                        }
+                    }
+                }
                 o.option(body, &mut warnings);
             } else if o.files.len() < MAX_FILE_ARGS {
                 o.files.push(arg.clone());
@@ -151,6 +180,7 @@ impl Options {
                     MAX_FILE_ARGS, arg
                 ));
             }
+            i += 1;
         }
         Parsed { opts: o, warnings }
     }
@@ -160,8 +190,8 @@ impl Options {
         // original's: it keeps the "tasm:" message prefix while the binary is
         // named tabasm, so the golden corpus stays byte-comparable.
         if let Some(name) = body.strip_prefix('-') {
-            // The long options that take a value do so as `--name=value`; the
-            // caller also accepts `--name value` by pre-joining them.
+            // Long options taking a value arrive here as `--name=value`;
+            // `parse` rewrites the separated form into this one first.
             if let Some((key, value)) = name.split_once('=') {
                 match key {
                     "cpu" => self.table = Some(value.to_string()),
@@ -351,6 +381,48 @@ mod tests {
         let o = opts(&["--message-prefix=tasm", "--page-title=Some Vendor."]);
         assert_eq!(o.message_prefix, "tasm");
         assert_eq!(o.page_title, "Some Vendor.");
+    }
+
+    #[test]
+    fn a_long_option_takes_its_value_either_spelled_way() {
+        // README uses the separated form throughout, so it has to work; the
+        // '=' form is what the parser reduces everything to internally.
+        for a in [vec!["--cpu", "z80"], vec!["--cpu=z80"]] {
+            assert_eq!(opts(&a).table.as_deref(), Some("z80"), "{:?}", a);
+        }
+        let o = opts(&["--message-prefix", "tasm", "--page-title", "Some Vendor."]);
+        assert_eq!(o.message_prefix, "tasm");
+        assert_eq!(o.page_title, "Some Vendor.");
+
+        // The whole README line, which is the one users will paste.
+        let o = opts(&[
+            "--compatibility",
+            "--bug-compatibility",
+            "--message-prefix",
+            "tasm",
+            "--cpu",
+            "8051",
+            "x.asm",
+        ]);
+        assert!(o.compatibility && o.bug_compatibility);
+        assert_eq!(o.message_prefix, "tasm");
+        assert_eq!(o.table.as_deref(), Some("8051"));
+        assert_eq!(o.files, ["x.asm"]);
+    }
+
+    #[test]
+    fn a_separated_value_is_consumed_and_never_read_as_a_file_name() {
+        // The value must not fall through to the positional list -- that would
+        // turn `--cpu z80 x.asm` into an assembly of "z80".
+        let o = opts(&["--cpu", "z80", "x.asm"]);
+        assert_eq!(o.files, ["x.asm"]);
+        // Consumed as getopt would, even when it looks like an option: a page
+        // title may legitimately begin with '-'.
+        assert_eq!(opts(&["--page-title", "-x"]).page_title, "-x");
+        // Trailing option with nothing after it: diagnosed, not swallowed.
+        let p = Options::parse(&["--cpu".to_string()], None);
+        assert!(p.warnings.iter().any(|w| w.contains("needs a value")));
+        assert_eq!(p.opts.table, None);
     }
 
     #[test]
