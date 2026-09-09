@@ -1,0 +1,20 @@
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0011: Duplicate label: (dup)
+0001   0000             ; The four strict-checking (-a) diagnostics, spec 1.4. A bare -a turns on all
+0002   0000             ; four bits, so this one source exercises each once and pins the exact wording
+0003   0000             ; and detail. Verified byte-for-byte against the 2001 release binary.
+0004   0000             ;   0x01  Invalid operand.  No indirection for this instruction.  (note 2 spaces)
+0005   0000             ;   0x02  Unused data in MS byte of argument.  -- detail is the discarded high
+0006   0000             ;         part in LOWER-case hex ($0AB00 with a 1-byte slot leaves ab)
+0007   0000             ;   0x04  Duplicate label:
+0008   0000             ;   0x08  Non-unary operator at beginning of expression.
+0009   0000                     .org 0
+0010   0000             dup     .equ 1
+0011   0000             dup     .equ 2            ; 0x04  Duplicate label: (dup)
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0012: Unused data in MS byte of argument. (ab)
+0012   0000 24 00               ADD  A,#0AB00h    ; 0x02  Unused data in MS byte of argument. (ab)
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0013: Invalid operand.  No indirection for this instruction. ((1234h))
+0013   0002 12 12 34            LCALL (1234h)     ; 0x01  Invalid operand.  No indirection ... ((1234h))
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0014: Non-unary operator at beginning of expression. (%101)
+0014   0005 12 00 05            LCALL %101        ; 0x08  Non-unary operator at beginning ... (%101)
+0015   0008                     .end
+tabasm: Number of errors = 4

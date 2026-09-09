@@ -1,0 +1,14 @@
+0001   0000             ; The export file (.exp): one re-includable ".EQU  $hhhh" line per exported
+0002   0000             ; symbol, so it can be .INCLUDEd into another assembly. Assemble with -51; the
+0003   0000             ; 4th positional output receives it. Two things a reimplementation must match:
+0004   0000             ; the exported value is masked to 16 bits, and a name of 16+ characters is not
+0005   0000             ; truncated (the field simply grows). Verified byte-for-byte against the 2001
+0006   0000             ; release binary. Documented in the manual 9.7.
+0007   0000                     .org 0
+0008   0000             low     .equ $1234
+0009   0000             wide    .equ $12abcd          ; masked to 16 bits on export -> $abcd
+0010   0000             areallylongsymbolname .equ $beef
+0011   0000                     .export low,wide,areallylongsymbolname
+0012   0000 00                  nop
+0013   0001                     .end
+tabasm: Number of errors = 0

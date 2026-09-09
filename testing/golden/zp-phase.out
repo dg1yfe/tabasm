@@ -1,0 +1,6 @@
+tabasm 0.1.0 -- table-driven cross-assembler.
+ Clean-room reimplementation from the TASM behavioural specification.
+tabasm: pass 1 complete.
+/Users/eligs/projects/tabasm/testing/cases/zp-phase.asm line 0022: label value misalligned.           (after)
+tabasm: pass 2 complete.
+tabasm: Number of errors = 1

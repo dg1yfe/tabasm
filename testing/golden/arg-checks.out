@@ -1,0 +1,9 @@
+tabasm 0.1.0 -- table-driven cross-assembler.
+ Clean-room reimplementation from the TASM behavioural specification.
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0011: Duplicate label: (dup)
+tabasm: pass 1 complete.
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0012: Unused data in MS byte of argument. (ab)
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0013: Invalid operand.  No indirection for this instruction. ((1234h))
+/Users/eligs/projects/tabasm/testing/cases/arg-checks.asm line 0014: Non-unary operator at beginning of expression. (%101)
+tabasm: pass 2 complete.
+tabasm: Number of errors = 4

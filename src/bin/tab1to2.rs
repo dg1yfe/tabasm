@@ -7,6 +7,11 @@
 //! is also what strips any authorship or revision headers a table may carry.
 //! Supplying `banner` replaces the table's own.
 
+// The shared modules are included by path so the converter stays a thin front
+// end over the same loader the assembler uses. Most of what they carry is
+// irrelevant here.
+#![allow(dead_code)]
+
 use std::process::ExitCode;
 
 #[path = "../cli.rs"]

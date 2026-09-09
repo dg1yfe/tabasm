@@ -1,0 +1,11 @@
+0001   0000             ; An .END address above 0xFFFF.
+0002   0000             ;
+0003   0000             ; The S9 terminator prints the end address in a fixed four-digit field, so the
+0004   0000             ; operand is range-checked and masked to 16 bits rather than allowed to overflow
+0005   0000             ; it. Assemble with -g2 to reach the S-record writer.
+0006   0000                     .org  0
+0007   0000 00                  nop
+0008   0001 00                  nop
+/Users/eligs/projects/tabasm/testing/cases/end-bigaddr.asm line 0009: END address out of range. (12345h)
+0009   0002                     .end  12345h
+tabasm: Number of errors = 1

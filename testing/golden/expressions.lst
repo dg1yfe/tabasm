@@ -1,0 +1,54 @@
+0001   0000             ; Expression evaluation, pinned.
+0002   0000             ; Assemble with -51.
+0003   0000             ;
+0004   0000             ; This case runs in the DEFAULT mode, which applies conventional operator
+0005   0000             ; precedence. tests/cases/expressions-compat.asm is the same source assembled
+0006   0000             ; with --compatibility, which restores the original left-to-right evaluation.
+0007   0000             ; Comparing the two golden listings shows exactly what the switch changes.
+0008   0000             ;
+0009   0000                     .org  0
+0010   0000             
+0011   0000             ; --- evaluation order -------------------------------------------------------
+0012   0000             ; Conventional precedence: * binds tighter than +.
+0013   0000             ; Under --compatibility these are 13, 21 and 20 instead.
+0014   0000 0B                  .byte 1+2*3+4           ; 11  = 1 + 6 + 4      (13 left-to-right)
+0015   0001 0F                  .byte 1+2*(3+4)         ; 15  = 1 + 14         (21 left-to-right)
+0016   0002 0E                  .byte 2+3*4             ; 14  = 2 + 12         (20 left-to-right)
+0017   0003 05                  .byte 10-2-3            ; 5   left associative, same in both modes
+0018   0004             
+0019   0004             ; --- radix prefixes ---------------------------------------------------------
+0020   0004 1F                  .byte $1F               ; 31  hex, $ followed by a hex digit
+0021   0005 0A                  .byte %1010             ; 10  binary
+0022   0006 0F                  .byte @17               ; 15  octal
+0023   0007             
+0024   0007             ; --- radix suffixes ---------------------------------------------------------
+0025   0007             ; A suffixed constant must begin with a digit, hence the leading zero on 0FFh.
+0026   0007 FF                  .byte 0FFh              ; 255 hex
+0027   0008 0A                  .byte 1010b             ; 10  binary
+0028   0009 64                  .byte 100d              ; 100 decimal
+0029   000A 47                  .byte 0107q             ; 71  octal
+0030   000B             
+0031   000B             ; --- character constant -----------------------------------------------------
+0032   000B 41                  .byte 'A'               ; 65  single quotes, exactly one character
+0033   000C             
+0034   000C             ; --- operators --------------------------------------------------------------
+0035   000C 01                  .byte 5>3               ; 1   comparisons yield 0 or 1
+0036   000D 00                  .byte 5<3               ; 0
+0037   000E 01                  .byte 5==5              ; 1
+0038   000F 02                  .byte 6&3               ; 2   bitwise and
+0039   0010 05                  .byte 4|1               ; 5   bitwise or
+0040   0011 05                  .byte 6^3               ; 5   bitwise xor
+0041   0012 10                  .byte 1<<4              ; 16  shift left
+0042   0013 08                  .byte 32>>2             ; 8   shift right
+0043   0014 02                  .byte 17%5              ; 2   modulo, since a value precedes it
+0044   0015 FF                  .byte ~0                ; FF  bitwise not, low byte
+0045   0016 01                  .byte !0                ; 1   logical not
+0046   0017 FF                  .byte -1                ; FF  leading minus works via a zero accumulator
+0047   0018             
+0048   0018             ; --- the program counter ----------------------------------------------------
+0049   0018             ; Both $ and * denote the counter at the start of the current statement.
+0050   0018 18                  .byte $                 ; address of this byte
+0051   0019 19                  .byte *                 ; address of this byte
+0052   001A             
+0053   001A                     .end
+tabasm: Number of errors = 0

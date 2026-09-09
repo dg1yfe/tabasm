@@ -23,3 +23,20 @@ opt-level = 2
 # Deliberately NOT panic = "abort". The robustness suite treats an abort as a
 # crash, so the binary must unwind rather than SIGABRT if a panic ever escapes.
 panic = "unwind"
+
+# The suites live in testing/ rather than cargo's default tests/ directory, so
+# they do not collide with the development harness of the same name.
+[[test]]
+name = "golden"
+path = "testing/golden.rs"
+harness = true
+
+[[test]]
+name = "conformance"
+path = "testing/conformance.rs"
+harness = true
+
+[[test]]
+name = "robustness"
+path = "testing/robustness.rs"
+harness = true

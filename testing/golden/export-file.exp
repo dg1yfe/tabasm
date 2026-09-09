@@ -1,0 +1,3 @@
+areallylongsymbolname .EQU  $beef
+low              .EQU  $1234
+wide             .EQU  $abcd

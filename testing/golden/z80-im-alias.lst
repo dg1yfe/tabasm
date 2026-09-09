@@ -1,0 +1,28 @@
+0001   0000             ; The IM0/IM1/IM2 alternate spellings in tasm80.tab.
+0002   0000             ; Assemble with -80 -x (Z80).
+0003   0000             ;
+0004   0000             ; tasm80.tab offers two spellings of the interrupt-mode instruction: "IM 0"
+0005   0000             ; with a space, and "IM0" without. The no-space rows were written without the
+0006   0000             ; ARGS column, so every field shifted one place -- the operand pattern became
+0007   0000             ; the opcode text, the opcode became the byte count, and so on -- and the rows
+0008   0000             ; could never match. "im0" was rejected as an unknown instruction and emitted
+0009   0000             ; nothing, while the opcodes those rows carried were correct all along.
+0010   0000             ;
+0011   0000             ; The rows have been repaired by supplying the empty operand pattern. Both
+0012   0000             ; spellings now assemble to the same, correct encodings.
+0013   0000             ;
+0014   0000                     .org  0
+0015   0000             
+0016   0000             ; Spaced form: always worked.
+0017   0000 ED 46               im    0                 ; ED 46
+0018   0002 ED 56               im    1                 ; ED 56
+0019   0004 ED 5E               im    2                 ; ED 5E
+0020   0006             
+0021   0006             ; No-space form: dead until the table was repaired, now identical to the above.
+0022   0006 ED 46               im0                     ; ED 46
+0023   0008 ED 56               im1                     ; ED 56
+0024   000A ED 5E               im2                     ; ED 5E
+0025   000C             
+0026   000C 00                  nop
+0027   000D                     .end
+tabasm: Number of errors = 0

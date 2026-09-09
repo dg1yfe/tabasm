@@ -1,0 +1,49 @@
+0001   0000             ; The .UNDEF directive.
+0002   0000             ; Assemble with -51.
+0003   0000             ;
+0004   0000             ; .UNDEF was listed in the directive table but implemented in neither pass, so
+0005   0000             ; it parsed cleanly and did nothing at all. It is honoured now; the same source
+0006   0000             ; under --compatibility (case "undef-compat") restores the old silence, and the
+0007   0000             ; two golden listings differ only in which branches were taken.
+0008   0000             ;
+0009   0000             ; Note the '#' prefix throughout. Macro expansion runs before parsing, so in
+0010   0000             ; ".undef FOO" the operand FOO would be replaced by its own definition before
+0011   0000             ; the directive ever saw it. A leading '#' suppresses expansion for the line.
+0012   0000             ; This is pre-existing behaviour, not a restriction of the fix: ".ifdef FOO"
+0013   0000             ; is affected in exactly the same way, which is why the shipped headers all
+0014   0000             ; use the '#' forms.
+0015   0000             ;
+0016   0000                     .org  0
+0017   0000             
+0018   0000             #define FOO 1
+0019   0000             #define BAR 2
+0020   0000             
+0021   0000             ; Both defined at this point.
+0022   0000             #ifdef FOO
+0023   0000 11                  .byte 011h              ; emitted: FOO is defined
+0024   0001             #endif
+0025   0001             #ifdef BAR
+0026   0001 22                  .byte 022h              ; emitted: BAR is defined
+0027   0002             #endif
+0028   0002             
+0029   0002             ; Remove one of them.
+0030   0002             #undef FOO
+0031   0002             
+0032   0002~            #ifdef FOO
+0033   0002~                    .byte 0AAh              ; default: NOT emitted.  --compatibility: emitted
+0034   0002             #else
+0035   0002 BB                  .byte 0BBh              ; default: emitted.      --compatibility: not
+0036   0003             #endif
+0037   0003             
+0038   0003             ; The other is untouched, which checks that removal compacts the table without
+0039   0003             ; disturbing its neighbours.
+0040   0003             #ifdef BAR
+0041   0003 33                  .byte 033h              ; emitted in both modes
+0042   0004             #endif
+0043   0004             
+0044   0004             ; Undefining a name that is not a macro is not an error.
+0045   0004             #undef NEVER_DEFINED
+0046   0004 44                  .byte 044h              ; emitted in both modes
+0047   0005             
+0048   0005                     .end
+tabasm: Number of errors = 0

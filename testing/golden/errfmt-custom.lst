@@ -1,0 +1,10 @@
+0001   0000             ; Reference to a label that is never defined.
+0002   0000             ; Exercises the "no such label" diagnostic on pass 2.
+0003   0000                     .org  0
+/Users/eligs/projects/tabasm/testing/cases/err-undef.asm(4): Label not found: (no_such_label)
+/Users/eligs/projects/tabasm/testing/cases/err-undef.asm(4): Unused data in MS byte of argument. (200)
+0004   0000 74 00               mov   a,#no_such_label
+/Users/eligs/projects/tabasm/testing/cases/err-undef.asm(5): Label not found: (also_missing)
+0005   0002 90 00 00            mov   dptr,#also_missing
+0006   0005                     .end
+tabasm: Number of errors = 3

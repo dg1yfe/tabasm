@@ -1,0 +1,6 @@
+tabasm 0.1.0 -- table-driven cross-assembler.
+ Clean-room reimplementation from the TASM behavioural specification.
+tabasm: pass 1 complete.
+/Users/eligs/projects/tabasm/testing/cases/end-bigaddr.asm line 0009: END address out of range. (12345h)
+tabasm: pass 2 complete.
+tabasm: Number of errors = 1
