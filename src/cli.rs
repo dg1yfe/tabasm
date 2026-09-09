@@ -324,18 +324,120 @@ impl Options {
     /// working. TASMTABS names a single directory, not a search path, and is
     /// joined with a literal '/' on every platform; with it unset the bare names
     /// resolve against the working directory.
-    pub fn table_paths(&self, tasmtabs: Option<&str>) -> Vec<String> {
+    pub fn table_paths(&self, look: &Lookup) -> Vec<String> {
         let sel = match self.table.as_ref() {
             Some(s) => s,
             None => return Vec::new(),
         };
-        [format!("{}.tab2", sel), format!("tasm{}.tab", sel)]
-            .into_iter()
-            .map(|name| match tasmtabs {
-                Some(dir) => format!("{}/{}", dir, name),
-                None => name,
-            })
-            .collect()
+        let mut out = Vec::new();
+        for dir in look.dirs() {
+            for name in [format!("{}.tab2", sel), format!("tasm{}.tab", sel)] {
+                out.push(match dir {
+                    // The working directory is named by a bare file name, as
+                    // it always has been.
+                    None => name,
+                    Some(ref d) => format!("{}{}{}", d, std::path::MAIN_SEPARATOR, name),
+                });
+            }
+        }
+        out
+    }
+}
+
+/// Where to look for an instruction table.
+///
+/// The original searched one directory, named by TASMTABS, or the working
+/// directory when that was unset -- which is fine when the tables sit beside
+/// the source, and useless once the program is installed somewhere and run
+/// from anywhere. The order below keeps those two first and in their original
+/// places, so nothing that resolves today can resolve differently; the rest
+/// only comes into play where the original would simply have failed.
+#[derive(Default, Debug)]
+pub struct Lookup {
+    /// TASMTABS: one directory, an explicit override, still not a path list.
+    pub tasmtabs: Option<String>,
+    /// The directory holding the running binary.
+    pub exe_dir: Option<String>,
+    /// XDG_DATA_HOME on unix, LOCALAPPDATA on Windows.
+    pub data_home: Option<String>,
+    /// The user's home directory, for the XDG default.
+    pub home: Option<String>,
+}
+
+impl Lookup {
+    /// Read the environment and the running executable's location.
+    pub fn from_env() -> Lookup {
+        let var = |k: &str| std::env::var(k).ok().filter(|v| !v.is_empty());
+        Lookup {
+            tasmtabs: var("TASMTABS"),
+            exe_dir: std::env::current_exe().ok().and_then(|p| {
+                p.parent()
+                    .map(|d| d.to_string_lossy().into_owned())
+                    .filter(|d| !d.is_empty())
+            }),
+            data_home: var(if cfg!(windows) {
+                "LOCALAPPDATA"
+            } else {
+                "XDG_DATA_HOME"
+            }),
+            home: var(if cfg!(windows) { "USERPROFILE" } else { "HOME" }),
+        }
+    }
+
+    /// The directories to try, in order. `None` means the working directory.
+    pub fn dirs(&self) -> Vec<Option<String>> {
+        let sep = std::path::MAIN_SEPARATOR;
+        let mut v: Vec<Option<String>> = Vec::new();
+
+        // 1.5, unchanged: an explicit TASMTABS wins, then the working
+        // directory. These two are the whole of the original behaviour.
+        if let Some(t) = &self.tasmtabs {
+            v.push(Some(t.clone()));
+        }
+        v.push(None);
+
+        if let Some(e) = &self.exe_dir {
+            // An unpacked archive, and any install that keeps the tables
+            // beside the program -- which is how Windows expects it.
+            v.push(Some(format!("{}{}tables", e, sep)));
+            // A prefix install: /usr/local/bin/tabasm finds
+            // /usr/local/share/tabasm/tables, and Homebrew's prefix works
+            // without knowing where Homebrew put itself.
+            v.push(Some(format!(
+                "{e}{sep}..{sep}share{sep}tabasm{sep}tables",
+                e = e,
+                sep = sep
+            )));
+        }
+
+        // Per-user data, by each platform's own rule.
+        match (&self.data_home, &self.home) {
+            (Some(d), _) => v.push(Some(format!("{}{}tabasm{}tables", d, sep, sep))),
+            (None, Some(h)) if !cfg!(windows) => {
+                v.push(Some(format!("{h}/.local/share/tabasm/tables", h = h)))
+            }
+            _ => {}
+        }
+        #[cfg(target_os = "macos")]
+        if let Some(h) = &self.home {
+            v.push(Some(format!(
+                "{}/Library/Application Support/tabasm/tables",
+                h
+            )));
+        }
+
+        // System-wide, as the filesystem hierarchy standard has it: what a
+        // package manager installs, then what a hand-built install does.
+        #[cfg(unix)]
+        {
+            v.push(Some("/usr/local/share/tabasm/tables".to_string()));
+            v.push(Some("/usr/share/tabasm/tables".to_string()));
+        }
+        #[cfg(windows)]
+        if let Some(pf) = std::env::var("ProgramFiles").ok().filter(|v| !v.is_empty()) {
+            v.push(Some(format!("{}{}tabasm{}tables", pf, sep, sep)));
+        }
+        v
     }
 }
 
@@ -368,10 +470,46 @@ mod tests {
     #[test]
     fn candidate_table_paths_are_tried_current_format_first() {
         let o = opts(&["--cpu=z80"]);
-        assert_eq!(o.table_paths(None), ["z80.tab2", "tasmz80.tab"]);
-        assert_eq!(o.table_paths(Some("/t")), ["/t/z80.tab2", "/t/tasmz80.tab"]);
-        // 1.5: a single directory joined with a literal '/', not a search path.
-        assert!(opts(&[]).table_paths(Some("/t")).is_empty());
+        // Nothing set: the working directory, by bare name, exactly as before.
+        let bare = Lookup::default();
+        let p = o.table_paths(&bare);
+        assert_eq!(&p[..2], ["z80.tab2", "tasmz80.tab"]);
+
+        // TASMTABS still comes first, and still names one directory.
+        let env = Lookup {
+            tasmtabs: Some("/t".into()),
+            ..Default::default()
+        };
+        let p = o.table_paths(&env);
+        assert_eq!(&p[..2], ["/t/z80.tab2", "/t/tasmz80.tab"]);
+        // ... and the working directory follows it rather than being replaced,
+        // so a table beside the source is still found when TASMTABS misses.
+        assert_eq!(&p[2..4], ["z80.tab2", "tasmz80.tab"]);
+
+        // No selector, no candidates, whatever the environment says.
+        assert!(opts(&[]).table_paths(&env).is_empty());
+    }
+
+    #[test]
+    fn the_search_order_reaches_the_conventional_install_locations() {
+        let o = opts(&["--cpu=z80"]);
+        let env = Lookup {
+            exe_dir: Some("/opt/homebrew/bin".into()),
+            home: Some("/home/u".into()),
+            ..Default::default()
+        };
+        let p = o.table_paths(&env);
+        let has = |frag: &str| p.iter().any(|c| c.contains(frag));
+        // Beside the binary: an unpacked archive, or a Windows install.
+        assert!(has("/opt/homebrew/bin/tables/z80.tab2"));
+        // One level up and into share: a prefix install, Homebrew included,
+        // without the program needing to know the prefix.
+        assert!(has("/opt/homebrew/bin/../share/tabasm/tables/z80.tab2"));
+        // The legacy name is offered in every directory, not just the first.
+        assert!(has("/opt/homebrew/bin/tables/tasmz80.tab"));
+        // TASMTABS unset here, so the working directory is still tried first
+        // after nothing.
+        assert_eq!(p[0], "z80.tab2");
     }
 
     #[test]

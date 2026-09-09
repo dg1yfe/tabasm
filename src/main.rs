@@ -90,12 +90,18 @@ fn main() {
     }
 
     // 1.5: failure to open the table is fatal, exit 3.
-    let paths = o.table_paths(std::env::var("TASMTABS").ok().as_deref());
+    let look = cli::Lookup::from_env();
+    let paths = o.table_paths(&look);
     let table = match paths.first().cloned() {
         Some(path) => match table::Table::load_first(&paths, o.table.as_deref().unwrap_or("")) {
             Ok(t) => t,
             Err(table::LoadError::Open(p)) => {
+                // With more than one place to look, "cannot open" is not much
+                // help on its own: say where it looked.
                 let _ = writeln!(out, "{}: cannot open table file {}", prog(&o), p);
+                for c in &paths {
+                    let _ = writeln!(out, "{}:   tried {}", prog(&o), c);
+                }
                 let _ = out.flush();
                 std::process::exit(EXIT_FILE);
             }

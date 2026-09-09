@@ -25,12 +25,36 @@ tabasm --cpu <name> [options] source [object [listing [export [symbol]]]]
 ```
 
 Only the source file is required; the other four default to the source's base
-name with `.obj`, `.lst`, `.exp` and `.sym`. Tables are found through `TASMTABS`,
-which names one directory:
+name with `.obj`, `.lst`, `.exp` and `.sym`.
 
 ```
-export TASMTABS=/usr/local/share/tabasm
 tabasm --cpu z80 -g2 firmware.asm firmware.s19
+```
+
+### Where the tables are found
+
+Each name is a file, so the assembler has to locate it. It tries, in order:
+
+1. `$TASMTABS`, which names one directory and overrides everything else;
+2. the working directory;
+3. `tables/` beside the executable — an unpacked archive, or a Windows install;
+4. `../share/tabasm/tables` relative to the executable, so `/usr/local/bin/tabasm`
+   finds `/usr/local/share/tabasm/tables` and a Homebrew prefix works unmodified;
+5. the per-user data directory — `$XDG_DATA_HOME/tabasm/tables`, or
+   `~/.local/share/tabasm/tables`; `%LOCALAPPDATA%\tabasm\tables` on Windows,
+   and `~/Library/Application Support/tabasm/tables` on macOS;
+6. `/usr/local/share/tabasm/tables`, then `/usr/share/tabasm/tables`;
+   `%ProgramFiles%\tabasm\tables` on Windows.
+
+The first two are the whole of the original's behaviour, in its order, so
+nothing that resolves today resolves differently. If no table is found, the
+error lists every path tried.
+
+To install from a release archive:
+
+```
+sudo cp tabasm tab1to2 /usr/local/bin/
+sudo mkdir -p /usr/local/share/tabasm && sudo cp -r tables /usr/local/share/tabasm/
 ```
 
 ### Targets
