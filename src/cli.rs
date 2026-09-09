@@ -445,6 +445,12 @@ impl Lookup {
 mod tests {
     use super::*;
 
+    /// Join with the platform's separator: the paths are built with
+    /// MAIN_SEPARATOR, which is a backslash on Windows.
+    fn j(parts: &[&str]) -> String {
+        parts.join(&std::path::MAIN_SEPARATOR.to_string())
+    }
+
     fn opts(args: &[&str]) -> Options {
         Options::parse(
             &args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
@@ -481,7 +487,7 @@ mod tests {
             ..Default::default()
         };
         let p = o.table_paths(&env);
-        assert_eq!(&p[..2], ["/t/z80.tab2", "/t/tasmz80.tab"]);
+        assert_eq!(&p[..2], [j(&["/t", "z80.tab2"]), j(&["/t", "tasmz80.tab"])]);
         // ... and the working directory follows it rather than being replaced,
         // so a table beside the source is still found when TASMTABS misses.
         assert_eq!(&p[2..4], ["z80.tab2", "tasmz80.tab"]);
@@ -499,14 +505,21 @@ mod tests {
             ..Default::default()
         };
         let p = o.table_paths(&env);
-        let has = |frag: &str| p.iter().any(|c| c.contains(frag));
+        let has = |frag: &str| p.iter().any(|c| c == frag);
         // Beside the binary: an unpacked archive, or a Windows install.
-        assert!(has("/opt/homebrew/bin/tables/z80.tab2"));
+        assert!(has(&j(&["/opt/homebrew/bin", "tables", "z80.tab2"])));
         // One level up and into share: a prefix install, Homebrew included,
         // without the program needing to know the prefix.
-        assert!(has("/opt/homebrew/bin/../share/tabasm/tables/z80.tab2"));
+        assert!(has(&j(&[
+            "/opt/homebrew/bin",
+            "..",
+            "share",
+            "tabasm",
+            "tables",
+            "z80.tab2"
+        ])));
         // The legacy name is offered in every directory, not just the first.
-        assert!(has("/opt/homebrew/bin/tables/tasmz80.tab"));
+        assert!(has(&j(&["/opt/homebrew/bin", "tables", "tasmz80.tab"])));
         // TASMTABS unset here, so the working directory is still tried first
         // after nothing.
         assert_eq!(p[0], "z80.tab2");

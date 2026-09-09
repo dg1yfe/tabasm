@@ -117,10 +117,14 @@ jobs:
             mkdir -p out && cp target/${{ matrix.target }}/release/tabasm out/
             cp target/${{ matrix.target }}/release/tab1to2 out/
             file out/tabasm
-            # A wrong-architecture or dynamically linked artifact is worse
-            # than a failed build, because it ships.
-            file out/tabasm | grep -q 'statically linked' \
-              || { echo 'not statically linked' >&2; exit 1; }
+            # A dynamically linked artifact is worse than a failed build,
+            # because it ships and then fails on the user's machine. Test for
+            # what must not be there: a static PIE reports "static-pie linked"
+            # rather than "statically linked", so testing for the positive
+            # rejects a perfectly good binary.
+            if file out/tabasm | grep -q 'dynamically linked'; then
+              echo 'dynamically linked, refusing to ship it' >&2; exit 1
+            fi
           else
             cargo build --release --locked
             mkdir -p out && cp target/release/tabasm.exe target/release/tab1to2.exe out/
