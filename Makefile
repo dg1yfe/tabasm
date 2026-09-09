@@ -46,11 +46,7 @@ install: build
 	$(INSTALL) -m 644 doc/tabasm.1 $(MANDIR)/tabasm.1
 	$(INSTALL) -m 644 README.md NOTICE LICENSE $(DOCDIR)/
 	$(INSTALL) -m 644 doc/table-format.md doc/table-format-legacy.md $(DOCDIR)/
-	@echo
 	@echo "installed to $(DESTDIR)$(PREFIX)"
-	@echo "tab1to2, which rewrites a legacy table in the current format, is not"
-	@echo "installed: the assembler reads legacy tables directly. It is built"
-	@echo "alongside at target/release/tab1to2 if you want it."
 
 uninstall:
 	rm -f $(BINDIR)/tabasm $(MANDIR)/tabasm.1
