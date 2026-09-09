@@ -1,9 +1,14 @@
-# Build wrapper for the test harness.
+# Build convenience: a binary at a fixed path, plus two things cargo will not
+# give you in one command.
 #
-# Some harnesses expect an executable at src/tabasm built
-# by `make -C src`. The cargo project itself lives at the repository root in
-# the idiomatic layout (Cargo.toml + src/*.rs); this Makefile only drives it
-# and drops the binary where the harness looks.
+# The cargo project lives at the repository root in the idiomatic layout
+# (Cargo.toml + src/*.rs); this only drives it and drops the binary here, where
+# anything wanting it at a known path can find it without knowing which profile
+# was built. SANITIZE=1 builds with arithmetic overflow trapping, and checksec
+# reports what the binary actually is.
+#
+# To install, use the Makefile at the repository root. This one installs
+# nothing.
 #
 #   make -C src              release build
 #   make -C src SANITIZE=1   debug build, overflow and debug assertions on

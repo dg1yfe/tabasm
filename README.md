@@ -54,9 +54,7 @@ make install PREFIX=/usr DESTDIR=/tmp/stage
 ```
 
 Rust, no dependencies, no `unsafe` code. `make` is a thin wrapper over
-`cargo build --release`, which works on its own if you prefer it. `make -C src`
-is a separate thing again: it drops a binary at `src/tabasm`, where the test
-harness looks for it.
+`cargo build --release`, which works on its own if you prefer it.
 
 ## Using it
 

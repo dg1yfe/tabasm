@@ -10,8 +10,9 @@
 #
 #   make install DESTDIR=/tmp/stage PREFIX=/usr
 #
-# src/Makefile is a different thing: a wrapper that drops a binary where the
-# test harness looks for it.
+# src/Makefile is a different thing: a convenience wrapper giving a binary at a
+# fixed path, a SANITIZE=1 build that traps arithmetic overflow, and a checksec
+# target. It installs nothing.
 
 PREFIX  ?= /usr/local
 DESTDIR ?=

@@ -22,8 +22,9 @@ Three properties shape everything else:
 Rust, no dependencies, no `unsafe`. `make` builds, `make install` installs to
 `$PREFIX` with the tables where the assembler looks for them, and `DESTDIR`
 stages that under another root. `cargo build --release` does the build on its
-own; `make -C src` is the wrapper that drops a binary where the test harness
-looks. `cargo test` runs everything.
+own. `make -C src` is a separate convenience: a binary at a fixed path,
+`SANITIZE=1` for a build that traps arithmetic overflow, and `checksec` to
+report what the binary is. `cargo test` runs everything.
 
 ## Style
 
@@ -86,8 +87,8 @@ RUSTFLAGS='-C overflow-checks=on -C debug-assertions=on' cargo test
 - `cargo fmt --check` and `cargo clippy -- -D warnings`, both of which are clean;
 - the minimum supported Rust version, read from `Cargo.toml` so the claim cannot
   drift;
-- that the tree stands alone: build it and assemble every target, outside the
-  test harness.
+- that the tree stands alone: build it and assemble every target directly,
+  without going through `cargo test`.
 
 Before pushing, the same gates locally:
 
