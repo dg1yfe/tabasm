@@ -61,6 +61,49 @@ fn banner(out: &mut dyn Write) {
     );
 }
 
+/// `--help`. Not `-h`: that is the hex dump, and was before this program
+/// existed. The full description is in tabasm(1); this is the reminder.
+fn usage(out: &mut impl Write) {
+    let _ = write!(
+        out,
+        "\nusage: tabasm --cpu <name> [options] source [object [listing [export [symbol]]]]
+
+  --cpu <name>              instruction table to use, required
+  --compatibility           original expression order; .UNDEF does nothing
+  --bug-compatibility       restore two defects the original had
+  --message-prefix <name>   name on the assembler's own messages
+  --page-title <text>       heading for a paged listing
+  --help                    this text
+
+  -a[xx]  strict-check mask, hex; bare -a sets all bits    (default 06)
+  -b      binary object output and block mode              (= -g3 -c)
+  -c      block mode: a counter change does not split records
+  -d<name>  define <name>, as #define would
+  -e      list macro lines expanded rather than as written
+  -f<xx>  fill byte for locations the source never writes
+  -g<n>   object format: 0 Intel HEX, 1 MOS Technology, 2 Motorola S-record,
+          3 raw binary, 4 Intel HEX with word addresses    (default 0)
+  -h      append a hex dump to the listing
+  -i      fold case in symbol names
+  -l      append the label table; -ll long form, -la all labels
+  -m      MOS Technology object format                     (= -g1)
+  -o<xx>  bytes per object record, hex                     (default 18)
+  -p<n>   page length in lines, decimal
+  -q      suppress the listing
+  -s      write the symbol file
+  -x<d>   instruction class mask, hex digit; bare -x all   (default 1)
+  -y      print elapsed time and line count
+  -z      write a trace to standard error
+
+Only the source is required; the other names default to the source base name
+with .obj, .lst, .exp and .sym.
+
+Tables are looked for in $TASMTABS, the working directory, beside the
+executable, and the usual share directories. See tabasm(1).
+"
+    );
+}
+
 fn main() {
     let started = std::time::Instant::now();
     let argv: Vec<String> = std::env::args().skip(1).collect();
@@ -72,6 +115,11 @@ fn main() {
     let mut out = stdout.lock();
 
     banner(&mut out);
+    if o.help {
+        usage(&mut out);
+        let _ = out.flush();
+        std::process::exit(EXIT_OK);
+    }
     for w in &parsed.warnings {
         let _ = writeln!(out, "{}: {}", prog(&o), w);
     }

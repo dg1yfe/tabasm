@@ -76,6 +76,8 @@ const CASES: &[Case] = &[
     c("opt-labels-long", &["--cpu=8051", "-ll"], "testing/smoke/8051.asm"),
     c("opt-labels-all", &["--cpu=8051", "-la"], "testing/smoke/8051.asm"),
     c("opt-hex", &["--cpu=8051", "-h"], "testing/smoke/8051.asm"),
+    // --help prints and stops. -h is the hex dump above and stays that way.
+    c("opt-help", &["--help"], "testing/smoke/8051.asm"),
     c("opt-paged", &["--cpu=8051", "-p20"], "testing/smoke/8051.asm"),
     c("opt-quiet", &["--cpu=8051", "-q"], "testing/smoke/8051.asm"),
     c("opt-expand", &["--cpu=8051", "-e"], "testing/smoke/8051.asm"),

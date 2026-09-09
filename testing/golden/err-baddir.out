@@ -1,4 +1,4 @@
-tabasm 2026.9.1 -- table-driven cross-assembler.
+tabasm 2026.9.2 -- table-driven cross-assembler.
  Clean-room reimplementation from the TASM behavioural specification.
 tabasm: pass 1 complete.
 err-baddir.asm line 0004: unrecognized directive.            (.NOTADIRECTIVE)

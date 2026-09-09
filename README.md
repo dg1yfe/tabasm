@@ -169,8 +169,11 @@ So to reproduce TASM's output exactly:
 tabasm --compatibility --bug-compatibility --message-prefix tasm --cpu 8051 x.asm
 ```
 
-`tabasm --help` is not implemented; this file is the reference. `doc/` documents
-both table formats.
+`tabasm --help` prints the options. `man tabasm` is the full reference, and
+`doc/` documents both table formats.
+
+There is no `-h` for help: `-h` appends a hex dump to the listing, as it did
+in the original.
 
 ## Testing
 

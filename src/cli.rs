@@ -50,6 +50,9 @@ pub struct Options {
     /// --message-prefix: the name on the assembler's own messages. TASM wrote
     /// `tasm:`; reproducing that byte-for-byte is a compatibility concern, so it
     /// is a value rather than a hidden behaviour.
+    /// --help: print usage and stop. There is no -h for it: -h already means
+    /// a hex dump appended to the listing, and has since the original.
+    pub help: bool,
     pub message_prefix: String,
     /// --page-title: the paged-listing heading used when the source sets no
     /// `.TITLE`.
@@ -86,6 +89,7 @@ impl Default for Options {
             timing: false,
             debug: false,
             compatibility: false,
+            help: false,
             message_prefix: "tabasm".to_string(),
             page_title: "tabasm".to_string(),
             bug_compatibility: false,
@@ -202,6 +206,7 @@ impl Options {
                 return;
             }
             match name {
+                "help" => self.help = true,
                 "compatibility" => self.compatibility = true,
                 "bug-compatibility" => self.bug_compatibility = true,
                 _ => warnings.push(format!("unrecognized option: --{}", name)),
