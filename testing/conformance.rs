@@ -553,6 +553,19 @@ fn listing_structure_is_invariant() {
     }
 }
 
+/// The CRLF case must actually contain CRLF. It is the only fixture whose
+/// bytes, rather than its text, are the point -- and an editor, a checkout or a
+/// well-meaning script can normalise it away without any test noticing, because
+/// the recorded output would simply be re-recorded to match.
+#[test]
+fn the_crlf_fixture_still_has_crlf_line_endings() {
+    let bytes = std::fs::read(root().join("testing/cases/crlf-source.asm")).expect("fixture");
+    let crlf = bytes.windows(2).filter(|w| w == b"\r\n").count();
+    let bare = bytes.iter().filter(|b| **b == b'\n').count() - crlf;
+    assert!(crlf > 10, "expected CRLF line endings, found {}", crlf);
+    assert_eq!(bare, 0, "{} lines lost their carriage return", bare);
+}
+
 /// Exit status is part of the interface: 0 clean, 1 diagnosed, 3 unopenable.
 #[test]
 fn exit_status_reflects_the_outcome() {
