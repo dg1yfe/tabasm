@@ -125,6 +125,11 @@ Four suites, no dependencies to install:
 - **`testing/robustness.rs`** — hostile sources, tables, command lines and
   environment variables must not crash or hang it.
 
+CI runs the suites on Linux, macOS and Windows, along with an overflow-checked
+build, `rustfmt`, `clippy` and the minimum supported Rust version. Because the
+recorded output was captured on one machine, running it on three is how the
+project checks that the assembler emits identical bytes everywhere.
+
 During development the assembler was also compared directly against the original
 release, over 363 artefacts across eleven processors and twelve output variants.
 That comparison needs the original binary and is not part of this repository.

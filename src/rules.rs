@@ -53,7 +53,10 @@ impl Enc {
     /// operand's source text as detail.
     fn range(&mut self, i: usize) {
         let detail = self.argt.get(i).cloned();
-        self.diags.push(Diag { msg: msg::RANGE_ARG, detail });
+        self.diags.push(Diag {
+            msg: msg::RANGE_ARG,
+            detail,
+        });
     }
 
     fn checked(&mut self, i: usize, lo: i32, hi: i32) -> i32 {
@@ -126,8 +129,7 @@ impl Enc {
         // 5.5: the post-rule transform. v1 states it once per table (the absence
         // of `.NOARGSHIFT`) and the loader resolves it onto each row; v2 writes
         // it per row. Zero/zero is the identity.
-        self.argval =
-            ((self.argval as u32) << (self.post_shift & 31) | self.post_or) as i32;
+        self.argval = ((self.argval as u32) << (self.post_shift & 31) | self.post_or) as i32;
     }
 
     // --- 7.4 JM: jump within a 2K page -------------------------------------
@@ -172,8 +174,8 @@ impl Enc {
         // test alone would wrongly shorten every forward reference (2.1).
         if (self.argval as i64) < 0x10000 && self.aval() < 0x100 {
             self.opcode = match self.opcode {
-                0x9C => 0x64, // STZ abs
-                0x9E => 0x74, // STZ abs,X
+                0x9C => 0x64,            // STZ abs
+                0x9E => 0x74,            // STZ abs,X
                 _ => self.opcode & 0xF7, // clear the absolute-addressing bit
             };
             self.arg_bytes = 1;
@@ -209,7 +211,7 @@ impl Enc {
             } else {
                 // The displacement occupies the HIGH byte, so the zero-page
                 // address is written first by the low-byte-first emitter.
-                self.argval = (((d & 0xFF) << 8) | (self.arg(1) & 0xFF)) as i32;
+                self.argval = ((d & 0xFF) << 8) | (self.arg(1) & 0xFF);
             }
         } else {
             self.argval = self.arg(1) & 0xFF;
@@ -272,7 +274,10 @@ impl Enc {
                 self.argt.first().cloned().unwrap_or_default(),
                 self.argt.get(1).cloned().unwrap_or_default()
             ));
-            self.diags.push(Diag { msg: msg::RANGE_ARG_LC, detail });
+            self.diags.push(Diag {
+                msg: msg::RANGE_ARG_LC,
+                detail,
+            });
         }
     }
 
@@ -349,7 +354,10 @@ impl Enc {
         let result = value & (self.aux_registers.saturating_sub(1));
         if result != value {
             let detail = self.argt.get(i).cloned();
-            self.diags.push(Diag { msg: msg::RANGE_ARP, detail });
+            self.diags.push(Diag {
+                msg: msg::RANGE_ARP,
+                detail,
+            });
         }
         result
     }
@@ -359,8 +367,16 @@ impl Enc {
     /// in -- tasm96.tab's `00FeFeFe` is three 8-bit fields whose low bit must
     /// be clear, because those operands are even-aligned register pairs.
     fn isargvalid(&mut self, i: usize, mask: u32, startbit: u32, width: u32) {
-        let widthmask: u32 = if width >= 32 { u32::MAX } else { (1u32 << width) - 1 };
-        let valid = if mask != 0 { widthmask & (mask >> startbit) } else { widthmask };
+        let widthmask: u32 = if width >= 32 {
+            u32::MAX
+        } else {
+            (1u32 << width) - 1
+        };
+        let valid = if mask != 0 {
+            widthmask & (mask >> startbit)
+        } else {
+            widthmask
+        };
         let mut v = self.arg(i) as u32;
         if self.arg(i) < 0 {
             v &= widthmask; // ignore sign extension
@@ -369,7 +385,10 @@ impl Enc {
             let detail = self.argt.get(i).cloned();
             // Note the lower case, distinct from the shared single-operand
             // check's msg::RANGE_ARG.
-            self.diags.push(Diag { msg: msg::RANGE_ARG_LC, detail });
+            self.diags.push(Diag {
+                msg: msg::RANGE_ARG_LC,
+                detail,
+            });
         }
     }
 
@@ -377,7 +396,11 @@ impl Enc {
 
     fn t1(&mut self) {
         let arg0 = self.shift_and(0, self.shift, self.or);
-        let arp = if self.argv.len() > 1 { self.arp_val(1) } else { 0 };
+        let arp = if self.argv.len() > 1 {
+            self.arp_val(1)
+        } else {
+            0
+        };
         self.opcode |= arp | arg0;
         self.argval = 0;
     }
@@ -549,7 +572,10 @@ impl Enc {
         let d = self.delta(self.arg(0));
         if !(-1024..=1023).contains(&d) {
             let detail = Some(format!("offset={}", d));
-            self.diags.push(Diag { msg: msg::RANGE_BRANCH_LC, detail });
+            self.diags.push(Diag {
+                msg: msg::RANGE_BRANCH_LC,
+                detail,
+            });
         } else {
             self.opcode |= (d as u32) & 0x07FF;
         }
@@ -673,7 +699,11 @@ impl Enc {
     /// Z8: two operands combined into one byte, arg0 in the low nibble and
     /// arg1 in the high. `swapped` selects C5, which exchanges them.
     fn cn(&mut self, swapped: bool) {
-        let (lo, hi) = if swapped { (1usize, 0usize) } else { (0usize, 1usize) };
+        let (lo, hi) = if swapped {
+            (1usize, 0usize)
+        } else {
+            (0usize, 1usize)
+        };
         let v = ((self.arg(lo) as u32) & 0x0F) | (((self.arg(hi) as u32) & 0x0F) << 4);
         self.argval = v as i32;
         if self.or != 0 && v != (v & self.or) {
@@ -682,7 +712,10 @@ impl Enc {
                 self.argt.first().cloned().unwrap_or_default(),
                 self.argt.get(1).cloned().unwrap_or_default()
             ));
-            self.diags.push(Diag { msg: msg::RANGE_ARG_LC, detail });
+            self.diags.push(Diag {
+                msg: msg::RANGE_ARG_LC,
+                detail,
+            });
         }
     }
 
@@ -711,7 +744,7 @@ impl Enc {
                 self.argval = 0;
                 self.err(msg::RANGE_BRANCH);
             } else {
-                self.argval = (((d & 0xFF) << 8) | (self.arg(0) & 0xFF)) as i32;
+                self.argval = ((d & 0xFF) << 8) | (self.arg(0) & 0xFF);
             }
         } else {
             self.argval = self.arg(0) & 0xFF;
@@ -784,15 +817,53 @@ mod tests {
     #[test]
     fn every_rule_the_shipped_tables_select_is_implemented() {
         let implemented = [
-            table::NO, table::JM, table::JT, table::R1, table::ZP, table::MZ,
-            table::MB, table::ZB, table::ZI, table::CO, table::CR, table::CS,
-            table::SW, table::R3REL, table::T1, table::TD, table::TL,
-            table::T5, table::TA, table::SU, table::R2, table::I1, table::I2,
-            table::I3, table::I4, table::I5, table::I6, table::I7, table::I8,
+            table::NO,
+            table::JM,
+            table::JT,
+            table::R1,
+            table::ZP,
+            table::MZ,
+            table::MB,
+            table::ZB,
+            table::ZI,
+            table::CO,
+            table::CR,
+            table::CS,
+            table::SW,
+            table::R3REL,
+            table::T1,
+            table::TD,
+            table::TL,
+            table::T5,
+            table::TA,
+            table::SU,
+            table::R2,
+            table::I1,
+            table::I2,
+            table::I3,
+            table::I4,
+            table::I5,
+            table::I6,
+            table::I7,
+            table::I8,
         ];
         let mut seen = std::collections::BTreeSet::new();
-        for sel in ["6502", "6800", "6805", "8048", "8051", "8085", "8096", "tms32010", "tms320c25", "tms7000", "z80"] {
-            let t = Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap();
+        for sel in [
+            "6502",
+            "6800",
+            "6805",
+            "8048",
+            "8051",
+            "8085",
+            "8096",
+            "tms32010",
+            "tms320c25",
+            "tms7000",
+            "z80",
+        ] {
+            let t = Table::load(&format!("tables/{}.tab2", sel), sel)
+                .ok()
+                .unwrap();
             for r in &t.rows {
                 assert!(
                     implemented.contains(&r.rule),

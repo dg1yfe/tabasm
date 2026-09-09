@@ -52,7 +52,10 @@ impl Image {
             Some(r) if r.start + r.bytes.len() as u32 == addr => r.bytes.push(byte),
             _ => {
                 self.flush();
-                self.cur = Some(Region { start: addr, bytes: vec![byte] });
+                self.cur = Some(Region {
+                    start: addr,
+                    bytes: vec![byte],
+                });
             }
         }
         true

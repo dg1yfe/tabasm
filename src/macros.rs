@@ -27,7 +27,10 @@ pub struct Macros {
 
 impl Macros {
     pub fn new() -> Macros {
-        Macros { list: Vec::new(), overflowed: false }
+        Macros {
+            list: Vec::new(),
+            overflowed: false,
+        }
     }
 
     fn position(&self, name: &str) -> Option<usize> {
@@ -70,7 +73,11 @@ impl Macros {
         };
 
         if let Some(i) = self.position(name) {
-            self.list[i] = Macro { name: name.to_string(), params, body };
+            self.list[i] = Macro {
+                name: name.to_string(),
+                params,
+                body,
+            };
             return None;
         }
         // 10.1: overflow here is NOT fatal -- the macro is dropped and the run
@@ -79,7 +86,11 @@ impl Macros {
             self.overflowed = true;
             return Some(crate::errlog::msg::TOO_MANY_MACROS);
         }
-        self.list.push(Macro { name: name.to_string(), params, body });
+        self.list.push(Macro {
+            name: name.to_string(),
+            params,
+            body,
+        });
         None
     }
 
@@ -350,8 +361,14 @@ mod tests {
     fn whole_identifiers_only_and_not_inside_quotes() {
         let mut ms = m();
         ms.define("FOO 1");
-        assert_eq!(ms.expand("        .byte FOOBAR", b';').0, "        .byte FOOBAR");
-        assert_eq!(ms.expand("        .text \"FOO\"", b';').0, "        .text \"FOO\"");
+        assert_eq!(
+            ms.expand("        .byte FOOBAR", b';').0,
+            "        .byte FOOBAR"
+        );
+        assert_eq!(
+            ms.expand("        .text \"FOO\"", b';').0,
+            "        .text \"FOO\""
+        );
         assert_eq!(ms.expand("        .byte FOO", b';').0, "        .byte 1");
     }
 

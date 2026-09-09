@@ -24,11 +24,17 @@ struct Case {
 }
 
 const fn c(id: &'static str, args: &'static [&'static str], src: &'static str) -> Case {
-    Case { id, args, src, env: &[] }
+    Case {
+        id,
+        args,
+        src,
+        env: &[],
+    }
 }
 
 /// The eleven targets, each with the object formats. Breadth across processors
 /// and encodings; `conformance.rs` supplies the depth.
+#[rustfmt::skip]
 const TARGETS: &[(&str, &str)] = &[
     ("8048", "--cpu=8048"),
     ("6502", "--cpu=6502"),
@@ -43,6 +49,7 @@ const TARGETS: &[(&str, &str)] = &[
     ("tms320c25", "--cpu=tms320c25"),
 ];
 
+#[rustfmt::skip]
 const FORMATS: &[(&str, &str)] = &[
     ("", ""),
     ("-g1", "-g1"),
@@ -52,7 +59,9 @@ const FORMATS: &[(&str, &str)] = &[
     ("-c", "-c"),
 ];
 
-/// Hand-written cases, each pinning a documented behaviour.
+/// Hand-written cases, each pinning a documented behaviour. Laid out as a table
+/// because that is what it is; rustfmt would give each entry five lines.
+#[rustfmt::skip]
 const CASES: &[Case] = &[
     // Listing and object options, on one target to keep the corpus small.
     c("opt-labels", &["--cpu=8051", "-l"], "testing/smoke/8051.asm"),
@@ -105,6 +114,7 @@ const CASES: &[Case] = &[
 
 /// TASMERRFORMAT, which is a printf format applied to four arguments and must be
 /// validated rather than trusted.
+#[rustfmt::skip]
 const ERRFMT: &[(&str, &str)] = &[
     ("errfmt-default", ""),
     ("errfmt-custom", "%s(%d): %s %s"),
@@ -165,7 +175,10 @@ fn check(id: &str, run: &Run, failures: &mut Vec<String>) {
                     ext,
                     a.len(),
                     b.len(),
-                    a.iter().zip(&b).position(|(x, y)| x != y).unwrap_or(a.len().min(b.len()))
+                    a.iter()
+                        .zip(&b)
+                        .position(|(x, y)| x != y)
+                        .unwrap_or(a.len().min(b.len()))
                 )
             }
         });
@@ -180,7 +193,7 @@ fn every_case_reproduces_its_recorded_output() {
     for (name, cpu) in TARGETS {
         for (tag, flag) in FORMATS {
             let id = if tag.is_empty() {
-                format!("{}", name)
+                name.to_string()
             } else {
                 format!("{}{}", name, tag)
             };
@@ -207,9 +220,17 @@ fn every_case_reproduces_its_recorded_output() {
 
     for (id, fmt) in ERRFMT {
         let scratch = Scratch::new("golden");
-        let env: Vec<(&str, &str)> =
-            if fmt.is_empty() { vec![] } else { vec![("TASMERRFORMAT", *fmt)] };
-        let run = assemble(&["--cpu=8051"], "testing/cases/err-undef.asm", &scratch, &env);
+        let env: Vec<(&str, &str)> = if fmt.is_empty() {
+            vec![]
+        } else {
+            vec![("TASMERRFORMAT", *fmt)]
+        };
+        let run = assemble(
+            &["--cpu=8051"],
+            "testing/cases/err-undef.asm",
+            &scratch,
+            &env,
+        );
         check(id, &run, &mut failures);
         n += 1;
     }

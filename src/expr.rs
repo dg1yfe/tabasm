@@ -28,10 +28,22 @@ pub struct Outcome {
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 enum Op {
-    Add, Sub, Mul, Div, Mod,
-    Shl, Shr,
-    Lt, Gt, Le, Ge, Eq, Ne,
-    And, Or, Xor,
+    Add,
+    Sub,
+    Mul,
+    Div,
+    Mod,
+    Shl,
+    Shr,
+    Lt,
+    Gt,
+    Le,
+    Ge,
+    Eq,
+    Ne,
+    And,
+    Or,
+    Xor,
 }
 
 impl Op {
@@ -95,7 +107,11 @@ pub fn eval_strict(
         check_non_unary: strict & 0x08 != 0,
     };
     let value = if compat { e.accumulator() } else { e.expr(1) };
-    Outcome { value, diags: e.diags, undefined: e.undefined }
+    Outcome {
+        value,
+        diags: e.diags,
+        undefined: e.undefined,
+    }
 }
 
 impl<'a> Eval<'a> {
@@ -415,7 +431,11 @@ impl<'a> Eval<'a> {
         match c {
             b'(' => {
                 self.pos += 1;
-                let v = if self.compat { self.accumulator_paren() } else { self.expr(1) };
+                let v = if self.compat {
+                    self.accumulator_paren()
+                } else {
+                    self.expr(1)
+                };
                 self.skip_ws();
                 if self.peek() == Some(b')') {
                     self.pos += 1;
@@ -427,7 +447,7 @@ impl<'a> Eval<'a> {
             // 3.2: `$` is a hex prefix only when a hex digit follows
             // immediately; otherwise it is the program counter (3.5).
             b'$' => {
-                if self.at(1).map_or(false, |d| d.is_ascii_hexdigit()) {
+                if self.at(1).is_some_and(|d| d.is_ascii_hexdigit()) {
                     self.pos += 1;
                     Some(self.radix(16))
                 } else {
@@ -485,7 +505,7 @@ impl<'a> Eval<'a> {
     /// convention: `0x10` is the number 0 followed by the symbol `x10`.
     fn number(&mut self) -> i32 {
         let start = self.pos;
-        while self.peek().map_or(false, |c| c.is_ascii_alphanumeric()) {
+        while self.peek().is_some_and(|c| c.is_ascii_alphanumeric()) {
             self.pos += 1;
         }
         let run = &self.s[start..self.pos];
@@ -498,8 +518,7 @@ impl<'a> Eval<'a> {
             _ => (10, run.len()),
         };
         let body = &run[..body_len];
-        let all_valid = !body.is_empty()
-            && body.iter().all(|c| (*c as char).to_digit(base).is_some());
+        let all_valid = !body.is_empty() && body.iter().all(|c| (*c as char).is_digit(base));
         if all_valid {
             let mut v: u32 = 0;
             for c in body {
@@ -696,8 +715,8 @@ mod tests {
         assert_eq!(v("--5"), 5);
         assert_eq!(v("~-1"), 0);
         assert_eq!(v("1 + +5"), 6); // unary + in any value position (default)
-        // 3.6: in the default mode an operator with no right-hand value ends
-        // the expression, so `5 ~ 3` is 5.
+                                    // 3.6: in the default mode an operator with no right-hand value ends
+                                    // the expression, so `5 ~ 3` is 5.
         assert_eq!(v("5 ~ 3"), 5);
         // In compatibility mode `~` in operator position replaces the
         // accumulator, so the same text is ~3.
@@ -712,8 +731,10 @@ mod tests {
         // 2.1: the sentinel is above the address space but its low 16 bits
         // are zero, which is why the shortening rules must test the full
         // value and not just the truncated one.
-        assert_eq!(UNDEFINED & 0xFFFF, 0);
-        assert!(UNDEFINED >= 0x10000);
+        // Compile-time, because both are properties of the constant rather
+        // than of anything this test runs.
+        const _: () = assert!(UNDEFINED & 0xFFFF == 0);
+        const _: () = assert!(UNDEFINED >= 0x10000);
     }
 
     #[test]

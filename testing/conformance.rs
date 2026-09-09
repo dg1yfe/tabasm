@@ -38,7 +38,10 @@ struct Table {
 
 fn read_table(path: &std::path::Path) -> Table {
     let text = std::fs::read_to_string(path).expect("table");
-    let mut t = Table { aux_registers: 2, ..Default::default() };
+    let mut t = Table {
+        aux_registers: 2,
+        ..Default::default()
+    };
     for line in text.lines() {
         let line = line.split(';').next().unwrap().trim();
         if line.is_empty() {
@@ -48,13 +51,14 @@ fn read_table(path: &std::path::Path) -> Table {
             let mut it = rest.split_whitespace();
             match it.next().unwrap_or("") {
                 "banner" => {
-                    t.banner = rest.splitn(3, '"').nth(1).unwrap_or("").to_string();
+                    t.banner = rest.split('"').nth(1).unwrap_or("").to_string();
                 }
                 "opcode-order" => t.ms_first = it.next() == Some("ms-first"),
                 "address-unit" => t.word_addr = it.next() == Some("word"),
                 "aux-registers" => t.aux_registers = it.next().unwrap_or("2").parse().unwrap_or(2),
                 "regset" => {
-                    t.regsets.push(rest.splitn(3, '"').nth(1).unwrap_or("").to_string());
+                    t.regsets
+                        .push(rest.split('"').nth(1).unwrap_or("").to_string());
                 }
                 _ => {}
             }
@@ -105,14 +109,22 @@ fn read_listing(text: &str) -> Vec<Listed> {
             .split_whitespace()
             .filter_map(|b| u8::from_str_radix(b, 16).ok())
             .collect();
-        let source = if l.len() > 24 { l[24..].to_string() } else { String::new() };
+        let source = if l.len() > 24 {
+            l[24..].to_string()
+        } else {
+            String::new()
+        };
         // A continuation repeats the line number with no source text; fold its
         // bytes into the line that started them.
         match out.last_mut() {
             Some(prev) if prev.line_no == line_no && source.is_empty() => {
                 prev.bytes.extend(bytes);
             }
-            _ => out.push(Listed { line_no, addr, bytes }),
+            _ => out.push(Listed {
+                line_no,
+                addr,
+                bytes,
+            }),
         }
     }
     out
@@ -128,10 +140,16 @@ fn read_object(text: &str) -> BTreeMap<u32, u8> {
                 continue; // the terminator record
             }
             let n = usize::from_str_radix(&r[..2], 16).unwrap_or(0);
-            (u32::from_str_radix(&r[2..6], 16).unwrap_or(0), &r[8..8 + n * 2])
+            (
+                u32::from_str_radix(&r[2..6], 16).unwrap_or(0),
+                &r[8..8 + n * 2],
+            )
         } else if let Some(r) = l.strip_prefix("S1") {
             let n = usize::from_str_radix(&r[..2], 16).unwrap_or(3) - 3;
-            (u32::from_str_radix(&r[2..6], 16).unwrap_or(0), &r[6..6 + n * 2])
+            (
+                u32::from_str_radix(&r[2..6], 16).unwrap_or(0),
+                &r[6..6 + n * 2],
+            )
         } else if let Some(r) = l.strip_prefix(';') {
             if r.len() < 6 {
                 continue;
@@ -140,7 +158,10 @@ fn read_object(text: &str) -> BTreeMap<u32, u8> {
             if n == 0 {
                 continue;
             }
-            (u32::from_str_radix(&r[2..6], 16).unwrap_or(0), &r[6..6 + n * 2])
+            (
+                u32::from_str_radix(&r[2..6], 16).unwrap_or(0),
+                &r[6..6 + n * 2],
+            )
         } else {
             continue;
         };
@@ -155,7 +176,16 @@ fn read_object(text: &str) -> BTreeMap<u32, u8> {
 // ---------------------------------------------------------------------------
 
 const TARGETS: &[&str] = &[
-    "8048", "6502", "6800", "6805", "8051", "8085", "8096", "z80", "tms7000", "tms32010",
+    "8048",
+    "6502",
+    "6800",
+    "6805",
+    "8051",
+    "8085",
+    "8096",
+    "z80",
+    "tms7000",
+    "tms32010",
     "tms320c25",
 ];
 
@@ -307,10 +337,22 @@ fn every_table_row_is_reachable_and_encodes_as_declared() {
         "{} of {} rows disagree with their table:\n  {}",
         problems.len(),
         checked,
-        problems.iter().take(40).cloned().collect::<Vec<_>>().join("\n  ")
+        problems
+            .iter()
+            .take(40)
+            .cloned()
+            .collect::<Vec<_>>()
+            .join("\n  ")
     );
-    assert!(checked > 2000, "expected to sweep the whole table set, got {}", checked);
-    eprintln!("{} distinct table rows checked against their declarations", checked);
+    assert!(
+        checked > 2000,
+        "expected to sweep the whole table set, got {}",
+        checked
+    );
+    eprintln!(
+        "{} distinct table rows checked against their declarations",
+        checked
+    );
 }
 
 /// Checksums are re-derived here, not remembered. A record whose checksum does
@@ -321,7 +363,12 @@ fn every_object_record_carries_a_correct_checksum() {
         for fmt in ["-g0", "-g1", "-g2", "-g4"] {
             let scratch = Scratch::new("cksum");
             let src = format!("testing/smoke/{}.asm", target);
-            let run = assemble(&[&format!("--cpu={}", target), "-x", fmt], &src, &scratch, &[]);
+            let run = assemble(
+                &[&format!("--cpu={}", target), "-x", fmt],
+                &src,
+                &scratch,
+                &[],
+            );
             let obj = run.text("obj");
             let mut records = 0;
             for l in obj.lines() {
@@ -341,8 +388,12 @@ fn every_object_record_carries_a_correct_checksum() {
                     "-g0" | "-g4" => {
                         let sum: u32 = bytes.iter().map(|b| *b as u32).sum();
                         assert_eq!(
-                            sum & 0xFF, 0,
-                            "{} {}: record does not close: {}", target, fmt, l
+                            sum & 0xFF,
+                            0,
+                            "{} {}: record does not close: {}",
+                            target,
+                            fmt,
+                            l
                         );
                     }
                     // Motorola: the checksum is the complement of the sum of the
@@ -351,8 +402,12 @@ fn every_object_record_carries_a_correct_checksum() {
                         let (body, ck) = bytes.split_at(bytes.len() - 1);
                         let sum: u32 = body.iter().map(|b| *b as u32).sum();
                         assert_eq!(
-                            (!sum) & 0xFF, ck[0] as u32,
-                            "{} {}: bad S-record checksum: {}", target, fmt, l
+                            (!sum) & 0xFF,
+                            ck[0] as u32,
+                            "{} {}: bad S-record checksum: {}",
+                            target,
+                            fmt,
+                            l
                         );
                     }
                     // MOS Technology: a plain 16-bit sum, four hex digits, not
@@ -365,8 +420,12 @@ fn every_object_record_carries_a_correct_checksum() {
                         let sum: u32 = body.iter().map(|b| *b as u32).sum();
                         let carried = ((ck[0] as u32) << 8) | ck[1] as u32;
                         assert_eq!(
-                            sum & 0xFFFF, carried,
-                            "{} {}: bad MOS checksum: {}", target, fmt, l
+                            sum & 0xFFFF,
+                            carried,
+                            "{} {}: bad MOS checksum: {}",
+                            target,
+                            fmt,
+                            l
                         );
                     }
                 }
@@ -467,8 +526,11 @@ fn documented_expression_values_hold() {
     for (expr, mode, want) in cases {
         let scratch = Scratch::new("expr");
         let path = scratch.path("e.asm");
-        std::fs::write(&path, format!("        .org 0\n        .byte {}\n        .end\n", expr))
-            .unwrap();
+        std::fs::write(
+            &path,
+            format!("        .org 0\n        .byte {}\n        .end\n", expr),
+        )
+        .unwrap();
         let mut args = vec!["--cpu=8051"];
         if !mode.is_empty() {
             args.push(mode);
@@ -504,7 +566,10 @@ fn bug_compatibility_changes_only_what_it_claims() {
             .filter(|l| hex_bytes(&l[1..]).iter().map(|b| *b as u32).sum::<u32>() & 0xFF != 0)
             .count();
         if mode {
-            assert!(bad > 0, "--bug-compatibility should restore the defective checksum");
+            assert!(
+                bad > 0,
+                "--bug-compatibility should restore the defective checksum"
+            );
         } else {
             assert_eq!(bad, 0, "by default every -g4 record must close");
         }
@@ -522,9 +587,21 @@ fn bug_compatibility_changes_only_what_it_claims() {
             &b,
             &[],
         );
-        assert_eq!(plain.obj, bug.obj, "{}: default object format must not change", target);
-        assert_eq!(plain.out, bug.out, "{}: standard output must not change", target);
-        assert_eq!(plain.code, bug.code, "{}: exit status must not change", target);
+        assert_eq!(
+            plain.obj, bug.obj,
+            "{}: default object format must not change",
+            target
+        );
+        assert_eq!(
+            plain.out, bug.out,
+            "{}: standard output must not change",
+            target
+        );
+        assert_eq!(
+            plain.code, bug.code,
+            "{}: exit status must not change",
+            target
+        );
     }
 }
 
@@ -544,9 +621,20 @@ fn listing_structure_is_invariant() {
             // any source text starts there.
             let field = if l.len() > 24 { &l[12..24] } else { &l[12..] };
             let n = field.split_whitespace().count();
-            assert!(n <= 4, "{}: more than four bytes on one line: {:?}", target, l);
+            assert!(
+                n <= 4,
+                "{}: more than four bytes on one line: {:?}",
+                target,
+                l
+            );
             if l.len() > 24 {
-                assert_eq!(&l[11..12], " ", "{}: column 11 is the skip marker: {:?}", target, l);
+                assert_eq!(
+                    &l[11..12],
+                    " ",
+                    "{}: column 11 is the skip marker: {:?}",
+                    target,
+                    l
+                );
             }
         }
     }
@@ -569,12 +657,27 @@ fn the_crlf_fixture_still_has_crlf_line_endings() {
 #[test]
 fn exit_status_reflects_the_outcome() {
     let scratch = Scratch::new("exit");
-    let clean = assemble(&["--cpu=8051", "-x"], "testing/smoke/8051.asm", &scratch, &[]);
+    let clean = assemble(
+        &["--cpu=8051", "-x"],
+        "testing/smoke/8051.asm",
+        &scratch,
+        &[],
+    );
     assert_eq!(clean.code, Some(0), "a clean assembly exits 0");
 
-    let errs = assemble(&["--cpu=8051"], "testing/cases/err-undef.asm", &scratch, &[]);
+    let errs = assemble(
+        &["--cpu=8051"],
+        "testing/cases/err-undef.asm",
+        &scratch,
+        &[],
+    );
     assert_eq!(errs.code, Some(1), "a diagnosed assembly exits 1");
 
-    let missing = assemble(&["--cpu=nosuchcpu"], "testing/smoke/8051.asm", &scratch, &[]);
+    let missing = assemble(
+        &["--cpu=nosuchcpu"],
+        "testing/smoke/8051.asm",
+        &scratch,
+        &[],
+    );
     assert_eq!(missing.code, Some(3), "an unopenable table exits 3");
 }

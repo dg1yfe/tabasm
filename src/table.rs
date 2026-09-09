@@ -201,9 +201,6 @@ impl Table {
         Self::load_first(&[path.to_string()], selector)
     }
 
-    /// True when the first line that is neither blank nor a `;` comment opens
-    /// with `%format`.
-
     pub(crate) fn load_v1(text: &str, selector: &str) -> Result<Table, LoadError> {
         let mut t = Table::new(selector);
 
@@ -288,6 +285,8 @@ fn banner_text(line: &str) -> String {
 /// Parse one instruction row. Shared with `.ADDINSTR`, which takes the same
 /// syntax from a source file (4.11) -- so this is reachable from hostile input
 /// and must not panic or allocate unboundedly.
+/// True when the first line that is neither blank nor a `;` comment opens with
+/// `%format`, which is what marks a table as the current format.
 pub fn is_v2(text: &str) -> bool {
     for raw in text.lines() {
         let l = raw.trim();
@@ -324,9 +323,16 @@ pub fn parse_row(line: &str) -> Option<Row> {
     // SHIFT and OR are optional and positional, and both are hex. Trailing
     // commentary is not: tasm48.tab has thirteen rows whose seventh field is
     // `;8041`. Take field 7 only when it really is hex, and field 8 only after.
-    let shift = f.get(6).filter(|s| is_hex(s)).map(|s| hex_val(s)).unwrap_or(0);
-    let or = if f.get(6).map_or(false, |s| is_hex(s)) {
-        f.get(7).filter(|s| is_hex(s)).map(|s| hex_val(s)).unwrap_or(0)
+    let shift = f
+        .get(6)
+        .filter(|s| is_hex(s))
+        .map(|s| hex_val(s))
+        .unwrap_or(0);
+    let or = if f.get(6).is_some_and(|s| is_hex(s)) {
+        f.get(7)
+            .filter(|s| is_hex(s))
+            .map(|s| hex_val(s))
+            .unwrap_or(0)
     } else {
         0
     };
@@ -411,10 +417,16 @@ mod tests {
             "51",
         );
         let (acall, lcall, bit) = (&t.rows[0], &t.rows[1], &t.rows[2]);
-        assert_eq!((acall.opcode, acall.opcode_bytes, acall.arg_bytes), (0x11, 1, 1));
+        assert_eq!(
+            (acall.opcode, acall.opcode_bytes, acall.arg_bytes),
+            (0x11, 1, 1)
+        );
         assert_eq!(acall.rule, JM);
         assert_eq!((acall.shift, acall.or), (0, 0xF800));
-        assert_eq!((lcall.opcode_bytes, lcall.arg_bytes, lcall.rule), (1, 2, SW));
+        assert_eq!(
+            (lcall.opcode_bytes, lcall.arg_bytes, lcall.rule),
+            (1, 2, SW)
+        );
         // Four hex digits is two opcode bytes, so 4 - 2 = 2 argument bytes.
         assert_eq!((bit.opcode_bytes, bit.arg_bytes), (2, 2));
     }
@@ -429,7 +441,10 @@ mod tests {
             &format!("{}.NOARGSHIFT\nADD !,@,@ 0088 2 T1 1 8 0F00\n", HEAD),
             "3225",
         );
-        assert_eq!((without.rows[0].post_shift, without.rows[0].post_or), (0, 0));
+        assert_eq!(
+            (without.rows[0].post_shift, without.rows[0].post_or),
+            (0, 0)
+        );
         assert_eq!((without.rows[0].shift, without.rows[0].or), (8, 0x0F00));
     }
 
@@ -466,11 +481,17 @@ mod tests {
     fn the_no_operand_spelling_is_two_quotes() {
         // The alias rows that once lacked this column could never match.
         let t = load(
-            &format!("{}IM0  \"\"      46ED 2 NOP 1\nIM   0       46ED 2 NOP 1\n", HEAD),
+            &format!(
+                "{}IM0  \"\"      46ED 2 NOP 1\nIM   0       46ED 2 NOP 1\n",
+                HEAD
+            ),
             "80",
         );
         assert_eq!(t.rows[0].args, "\"\"");
-        assert_eq!((t.rows[0].opcode, t.rows[0].opcode_bytes, t.rows[0].rule), (0x46ED, 2, NO));
+        assert_eq!(
+            (t.rows[0].opcode, t.rows[0].opcode_bytes, t.rows[0].rule),
+            (0x46ED, 2, NO)
+        );
         assert_eq!(t.rows[1].args, "0");
     }
 

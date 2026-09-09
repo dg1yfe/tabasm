@@ -150,7 +150,10 @@ mod tests {
     /// The last record of tests/golden/51-g0.obj and friends: the same six
     /// bytes at 0x0168 in each of the four text formats.
     fn tail() -> Region {
-        Region { start: 0x0168, bytes: vec![0x12, 0x62, 0x12, 0x63, 0x12, 0x56] }
+        Region {
+            start: 0x0168,
+            bytes: vec![0x12, 0x62, 0x12, 0x63, 0x12, 0x56],
+        }
     }
 
     fn text(v: Vec<u8>) -> String {
@@ -178,7 +181,10 @@ mod tests {
     #[test]
     fn a_full_length_record_shows_the_srecord_length_convention() {
         // 24 data bytes print as 1B, counting the address and checksum bytes.
-        let r = Region { start: 0, bytes: (0..24).map(|_| 0u8).collect() };
+        let r = Region {
+            start: 0,
+            bytes: (0..24).map(|_| 0u8).collect(),
+        };
         let s = text(srec(&[r], 0x18, 0));
         assert!(s.starts_with("S11B0000"), "got {}", &s[..12]);
     }
@@ -191,16 +197,19 @@ mod tests {
         // Default now sums the printed address; --bug-compatibility restores
         // the defect, which is what the corpus pins.
         let data: Vec<u8> = vec![
-            0x36, 0x37, 0x34, 0x56, 0x35, 0x12, 0x01, 0x93, 0x58, 0x59, 0x5A, 0x5B,
-            0x5C, 0x5D, 0x5E, 0x5F, 0x56, 0x57, 0x54, 0x56, 0x55, 0x12, 0xB0, 0x81,
+            0x36, 0x37, 0x34, 0x56, 0x35, 0x12, 0x01, 0x93, 0x58, 0x59, 0x5A, 0x5B, 0x5C, 0x5D,
+            0x5E, 0x5F, 0x56, 0x57, 0x54, 0x56, 0x55, 0x12, 0xB0, 0x81,
         ];
-        let r = Region { start: 0x18, bytes: data };
+        let r = Region {
+            start: 0x18,
+            bytes: data,
+        };
         let cs = |s: &str| {
             let l = s.lines().next().unwrap();
             l[l.len() - 2..].to_string()
         };
-        let g0 = text(intel(&[r.clone()], 0x18, false, false));
-        let bug = text(intel(&[r.clone()], 0x18, true, true));
+        let g0 = text(intel(std::slice::from_ref(&r), 0x18, false, false));
+        let bug = text(intel(std::slice::from_ref(&r), 0x18, true, true));
         let fixed = text(intel(&[r], 0x18, true, false));
 
         assert!(g0.starts_with(":18001800"), "{}", &g0[..12]);
@@ -227,7 +236,10 @@ mod tests {
     #[test]
     fn record_length_is_hexadecimal() {
         // 8.2: -o32 means 0x32 = 50 bytes per record, not 32.
-        let r = Region { start: 0, bytes: (0..60u8).collect() };
+        let r = Region {
+            start: 0,
+            bytes: (0..60u8).collect(),
+        };
         let recs = records(&r, 0x32);
         assert_eq!(recs[0].1.len(), 50);
         assert_eq!(recs[1].1.len(), 10);

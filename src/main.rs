@@ -10,15 +10,15 @@ mod cli;
 mod errlog;
 mod expr;
 mod image;
+mod limits;
+mod listing;
+mod macros;
 mod matcher;
 mod object;
 mod rules;
 mod symbols;
 mod table;
 mod table2;
-mod limits;
-mod listing;
-mod macros;
 
 use cli::Options;
 use limits::*;
@@ -55,7 +55,10 @@ fn banner(out: &mut dyn Write) {
         "tabasm {} -- table-driven cross-assembler.",
         env!("CARGO_PKG_VERSION")
     );
-    let _ = writeln!(out, " Clean-room reimplementation from the TASM behavioural specification.");
+    let _ = writeln!(
+        out,
+        " Clean-room reimplementation from the TASM behavioural specification."
+    );
 }
 
 fn main() {
@@ -159,7 +162,11 @@ fn main() {
     // the identity strings; a reimplementation need not match them exactly.
     if a.o.timing {
         let secs = started.elapsed().as_secs_f64();
-        let rate = if secs > 0.0 { (a.lines_read as f64 / secs) as u64 } else { 0 };
+        let rate = if secs > 0.0 {
+            (a.lines_read as f64 / secs) as u64
+        } else {
+            0
+        };
         let _ = writeln!(
             out,
             "Elapsed time = {:.2} secs  lines = {}   lines/sec = {}",

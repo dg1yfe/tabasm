@@ -144,7 +144,7 @@ impl Asm {
     /// 5.3: an odd byte count still advances the counter by a whole word.
     fn advance(&mut self, bytes: u32) {
         self.pc = if self.table.wordaddrs {
-            self.pc.wrapping_add((bytes + 1) / 2)
+            self.pc.wrapping_add(bytes.div_ceil(2))
         } else {
             self.pc.wrapping_add(bytes)
         };
@@ -186,7 +186,7 @@ impl Asm {
     // --- diagnostics --------------------------------------------------------
 
     fn skipping(&self) -> bool {
-        self.cond.last().map_or(false, |c| !c.active)
+        self.cond.last().is_some_and(|c| !c.active)
     }
 
     /// 9.5: diagnostics go to standard output AND into the listing. 4.6/9.5:
@@ -212,7 +212,9 @@ impl Asm {
     }
 
     fn report(&mut self, message: &str, detail: Option<String>) {
-        let text = self.fmt.render(&self.file, self.line_no, message, detail.as_deref());
+        let text = self
+            .fmt
+            .render(&self.file, self.line_no, message, detail.as_deref());
         self.stdout.push_str(&text);
         self.stdout.push('\n');
         if self.listing_on && !self.o.quiet {
@@ -321,7 +323,11 @@ impl Asm {
         }
 
         // -e lists the expanded form rather than the source as written.
-        let shown = if self.o.expand { expanded.clone() } else { src.to_string() };
+        let shown = if self.o.expand {
+            expanded.clone()
+        } else {
+            src.to_string()
+        };
 
         // 3. Strip the comment.
         let code = strip_comment(&expanded, self.comment_char);
@@ -351,7 +357,14 @@ impl Asm {
             return;
         }
         let first = bytes.len().min(listing::BYTES_PER_LINE);
-        let l = listing::line(self.line_no, self.depth, self.line_pc, skipped, &bytes[..first], shown);
+        let l = listing::line(
+            self.line_no,
+            self.depth,
+            self.line_pc,
+            skipped,
+            &bytes[..first],
+            shown,
+        );
         self.push_lst(l);
         // 9.1: continuation lines repeat the line number, advance the address
         // and leave the source column empty.
@@ -374,11 +387,14 @@ impl Asm {
 
         // 4.2: a directive begins with a non-letter. Both '.' and '#' are
         // accepted for every directive, interchangeably.
-        let is_directive = !mnem.is_empty()
-            && !mnem.as_bytes()[0].is_ascii_alphabetic();
+        let is_directive = !mnem.is_empty() && !mnem.as_bytes()[0].is_ascii_alphabetic();
         let dname = if is_directive {
             let d = mnem.trim_start_matches(['.', '#']);
-            if d.is_empty() { mnem.to_ascii_uppercase() } else { d.to_ascii_uppercase() }
+            if d.is_empty() {
+                mnem.to_ascii_uppercase()
+            } else {
+                d.to_ascii_uppercase()
+            }
         } else {
             String::new()
         };
@@ -392,7 +408,10 @@ impl Asm {
             {
                 self.conditional(&dname, &operand);
             } else if is_directive && matches!(dname.as_str(), "IF" | "IFDEF" | "IFNDEF") {
-                self.cond.push(Cond { active: false, taken: true });
+                self.cond.push(Cond {
+                    active: false,
+                    taken: true,
+                });
             }
             return Ok(());
         }
@@ -473,7 +492,10 @@ impl Asm {
             }
             // 0x08: an operand opening with a binary operator.
             if self.o.strict & 0x08 != 0
-                && matches!(t.as_bytes()[0], b'%' | b'*' | b'/' | b'<' | b'>' | b'=' | b'&' | b'!')
+                && matches!(
+                    t.as_bytes()[0],
+                    b'%' | b'*' | b'/' | b'<' | b'>' | b'=' | b'&' | b'!'
+                )
             {
                 self.diag(msg::NON_UNARY, Some(t.to_string()));
             }
@@ -726,7 +748,11 @@ fn split_statements(line: &str) -> Vec<String> {
 /// 4.1: a label is recognised ONLY in column 1. The token ends at a space,
 /// tab, `\`, `:`, end of line -- or immediately after an `=`, which is what
 /// makes `*=$1000` work and what makes `LABEL=5` produce the label `LABEL=`.
-fn split_statement(stmt: &str, comment_char: u8, local_char: u8) -> (Option<String>, String, String) {
+fn split_statement(
+    stmt: &str,
+    comment_char: u8,
+    local_char: u8,
+) -> (Option<String>, String, String) {
     let b = stmt.as_bytes();
     if b.is_empty() {
         return (None, String::new(), String::new());
@@ -805,7 +831,11 @@ fn text_bytes(s: &str) -> (Vec<u8>, bool) {
     let mut out = Vec::new();
     // A string that does not start with a quote is taken literally to end of
     // line; one that opens but never closes is diagnosed.
-    let (body, quoted) = if b.first() == Some(&b'"') { (&b[1..], true) } else { (b, false) };
+    let (body, quoted) = if b.first() == Some(&b'"') {
+        (&b[1..], true)
+    } else {
+        (b, false)
+    };
     let mut closed = !quoted;
     let mut i = 0usize;
     while i < body.len() {
@@ -858,7 +888,10 @@ impl Asm {
                 let outer = !self.skipping();
                 if self.cond.len() >= MAX_CONDITIONALS - 1 {
                     self.diag(msg::COND_TOO_DEEP, None);
-                    self.cond.push(Cond { active: false, taken: true });
+                    self.cond.push(Cond {
+                        active: false,
+                        taken: true,
+                    });
                     return;
                 }
                 let want = if !outer {
@@ -872,7 +905,10 @@ impl Asm {
                         _ => self.eval(operand) != 0,
                     }
                 };
-                self.cond.push(Cond { active: want, taken: want });
+                self.cond.push(Cond {
+                    active: want,
+                    taken: want,
+                });
             }
             "ELSE" => match self.cond.last_mut() {
                 Some(c) => {
@@ -881,10 +917,8 @@ impl Asm {
                 }
                 None => self.diag(msg::ELSE_NO_MATCH, None),
             },
-            "ENDIF" => {
-                if self.cond.pop().is_none() {
-                    self.diag(msg::ENDIF_NO_MATCH, None);
-                }
+            "ENDIF" if self.cond.pop().is_none() => {
+                self.diag(msg::ENDIF_NO_MATCH, None);
             }
             _ => {}
         }
@@ -940,7 +974,8 @@ impl Asm {
                 // so it must not depend on a forward reference. It is taken as
                 // a 16-bit value, so a negative count wraps -- .fill -1 fills
                 // 65535 bytes.
-                let count = (self.eval(args.first().map(|s| s.trim()).unwrap_or("0")) as u32) & 0xFFFF;
+                let count =
+                    (self.eval(args.first().map(|s| s.trim()).unwrap_or("0")) as u32) & 0xFFFF;
                 let value = match args.get(1) {
                     Some(v) => self.eval(v.trim()) as u8,
                     None => 0xFF,
@@ -1247,7 +1282,12 @@ impl Asm {
         for sym in self.sorted_symbols() {
             let v = (sym.value as u32) & 0xFFFF;
             if self.avsym {
-                s.push_str(&format!("AS {:<16}  {}:{:04x}\n", sym.name, sym.segment.letter(), v));
+                s.push_str(&format!(
+                    "AS {:<16}  {}:{:04x}\n",
+                    sym.name,
+                    sym.segment.letter(),
+                    v
+                ));
             } else {
                 s.push_str(&format!("{:<16}  {:04x}\n", sym.name, v));
             }
@@ -1263,7 +1303,11 @@ impl Asm {
     fn export_file(&self) -> String {
         let mut s = String::new();
         for sym in self.sorted_symbols().iter().filter(|s| s.exported) {
-            s.push_str(&format!("{:<16} .EQU  ${:04x}\n", sym.name, (sym.value as u32) & 0xFFFF));
+            s.push_str(&format!(
+                "{:<16} .EQU  ${:04x}\n",
+                sym.name,
+                (sym.value as u32) & 0xFFFF
+            ));
         }
         s
     }
@@ -1280,7 +1324,11 @@ impl Asm {
         let _ = std::fs::write(obj, data);
 
         // 1.3: -q suppresses the listing. The file is still created, empty.
-        let text = if self.o.quiet { String::new() } else { self.build_listing(count) };
+        let text = if self.o.quiet {
+            String::new()
+        } else {
+            self.build_listing(count)
+        };
         let _ = std::fs::write(lst, text);
 
         // 9.6: written when -s is given, or when the source used .SYM/.AVSYM,
@@ -1408,8 +1456,9 @@ impl Asm {
             // whose corpus starts at zero.
             let mut a = lo;
             while a <= hi {
-                let row: Vec<String> =
-                    (0..16).map(|i| format!("{:02X}", self.img.read(a + i))).collect();
+                let row: Vec<String> = (0..16)
+                    .map(|i| format!("{:02X}", self.img.read(a + i)))
+                    .collect();
                 out.push(format!("{:04X}  {}", a, row.join(" ")));
                 a += 16;
             }
@@ -1506,7 +1555,10 @@ mod tests {
             }
             l.iter().map(|s| s.to_string()).collect()
         }
-        assert_eq!(order(&["bee", "dee", "ayy", "azz", "ell"]), ["ayy", "bee", "azz", "dee", "ell"]);
+        assert_eq!(
+            order(&["bee", "dee", "ayy", "azz", "ell"]),
+            ["ayy", "bee", "azz", "dee", "ell"]
+        );
         // 6805: bit3 data addz addr loop1 -> addz bit3 addr data loop1
         assert_eq!(
             order(&["bit3", "data", "addz", "addr", "loop1"]),
@@ -1531,6 +1583,9 @@ mod tests {
         // definition order inside the bucket: labimm, lab2, lab3, lab5, ...
         let mut v = vec!["labimm", "lab2", "lab3", "lab5", "labbt_1", "bit", "lab4"];
         v.sort_unstable();
-        assert_eq!(v, ["bit", "lab2", "lab3", "lab4", "lab5", "labbt_1", "labimm"]);
+        assert_eq!(
+            v,
+            ["bit", "lab2", "lab3", "lab4", "lab5", "labbt_1", "labimm"]
+        );
     }
 }

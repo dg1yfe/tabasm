@@ -41,7 +41,14 @@ fn bytes_field(bytes: &[u8]) -> String {
 ///
 /// `skipped` sets the marker in column 11 for a line inside a false
 /// conditional branch (9.3); such lines are still listed.
-pub fn line(lineno: u32, depth: usize, pc: u32, skipped: bool, bytes: &[u8], source: &str) -> String {
+pub fn line(
+    lineno: u32,
+    depth: usize,
+    pc: u32,
+    skipped: bool,
+    bytes: &[u8],
+    source: &str,
+) -> String {
     // 9.1: the generated prefix is upper-cased BEFORE the source is appended,
     // so a lower-case mnemonic keeps its case beside upper-case hex.
     let prefix = format!(
@@ -85,7 +92,14 @@ mod tests {
     fn lines_match_the_corpus_byte_for_byte() {
         // tests/golden/51.lst line 24.
         assert_eq!(
-            line(24, 0, 0x0002, false, &[0x28], "        ADD  A,R0     ;28    1   NOP 1"),
+            line(
+                24,
+                0,
+                0x0002,
+                false,
+                &[0x28],
+                "        ADD  A,R0     ;28    1   NOP 1"
+            ),
             "0024   0002 28                  ADD  A,R0     ;28    1   NOP 1"
         );
         // A line with no bytes and no source is exactly the 24-char prefix.
@@ -98,7 +112,14 @@ mod tests {
     fn a_five_byte_instruction_wraps_after_four() {
         // tests/golden/68.lst lines 339-340: BRCLR emits 18 1F 34 12 EB.
         assert_eq!(
-            line(339, 0, 0x0200, false, &[0x18, 0x1F, 0x34, 0x12], "        BRCLR   addr1,Y,bmsk,lab1"),
+            line(
+                339,
+                0,
+                0x0200,
+                false,
+                &[0x18, 0x1F, 0x34, 0x12],
+                "        BRCLR   addr1,Y,bmsk,lab1"
+            ),
             "0339   0200 18 1F 34 12         BRCLR   addr1,Y,bmsk,lab1"
         );
         let cont = continuation(339, 0, 0x0204, &[0xEB]);

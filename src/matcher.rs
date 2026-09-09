@@ -24,7 +24,10 @@ pub struct Matched {
 pub fn find(table: &Table, mnemonic: &str, operand: &str, class_mask: u32) -> Option<Matched> {
     let mnem = mnemonic.to_ascii_uppercase();
     // 6.1: the matcher works on operand text with all whitespace removed.
-    let orig: Vec<u8> = operand.bytes().filter(|b| !b.is_ascii_whitespace()).collect();
+    let orig: Vec<u8> = operand
+        .bytes()
+        .filter(|b| !b.is_ascii_whitespace())
+        .collect();
     let upper: Vec<u8> = orig.iter().map(|b| b.to_ascii_uppercase()).collect();
 
     for (i, row) in table.rows.iter().enumerate() {
@@ -55,7 +58,11 @@ fn walk(
     // 5.4: `""` is the pattern for an instruction that takes no operands.
     if row.args == "\"\"" {
         return if orig.is_empty() {
-            Some(Matched { row: index, opcode: row.opcode, args: Vec::new() })
+            Some(Matched {
+                row: index,
+                opcode: row.opcode,
+                args: Vec::new(),
+            })
         } else {
             None
         };
@@ -80,17 +87,13 @@ fn walk(
                 // or ']', and the extractor uses that delimiter to terminate
                 // the capture.
                 Some(&d @ (b',' | b'[' | b']')) => {
-                    match upper[o..].iter().position(|&b| b == d) {
-                        Some(k) => o + k,
-                        None => return None,
-                    }
+                    let k = upper[o..].iter().position(|&b| b == d)?;
+                    o + k
                 }
                 // Patterns like `*),` end the capture at the `),`.
                 Some(b')') if tail.get(1) == Some(&b',') => {
-                    match upper[o..].windows(2).position(|w| w == b"),") {
-                        Some(k) => o + k,
-                        None => return None,
-                    }
+                    let k = upper[o..].windows(2).position(|w| w == b"),")?;
+                    o + k
                 }
                 // The last wildcard: leave as many trailing operand
                 // characters as there are pattern characters after it.
@@ -165,7 +168,9 @@ mod tests {
     use crate::table::{self, Table};
 
     fn load(sel: &str) -> Table {
-        Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap()
+        Table::load(&format!("tables/{}.tab2", sel), sel)
+            .ok()
+            .unwrap()
     }
 
     #[test]

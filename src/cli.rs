@@ -26,23 +26,23 @@ pub struct Options {
     /// assembler's behaviour depends on which table was *named* rather than on
     /// the table's contents.
     pub table: Option<String>,
-    pub strict: u32,       // -a<xx>, hex bit mask (1.4)
-    pub format: ObjFormat, // -g<x>
-    pub block: bool,       // -c, contiguous block output
-    pub defines: Vec<String>, // -d<macro>
-    pub expand: bool,      // -e, list macro-expanded source
-    pub fill: Option<u8>,  // -f<xx>, pre-fill the image
-    pub hex_dump: bool,    // -h
-    pub ignore_case: bool, // -i
-    pub labels: LabelTable, // -l, -ll, -la
-    pub bytes_per_record: u32, // -o<xx>, HEX (8.2)
+    pub strict: u32,             // -a<xx>, hex bit mask (1.4)
+    pub format: ObjFormat,       // -g<x>
+    pub block: bool,             // -c, contiguous block output
+    pub defines: Vec<String>,    // -d<macro>
+    pub expand: bool,            // -e, list macro-expanded source
+    pub fill: Option<u8>,        // -f<xx>, pre-fill the image
+    pub hex_dump: bool,          // -h
+    pub ignore_case: bool,       // -i
+    pub labels: LabelTable,      // -l, -ll, -la
+    pub bytes_per_record: u32,   // -o<xx>, HEX (8.2)
     pub page_lines: Option<u32>, // -p<lines>
-    pub quiet: bool,       // -q, suppress the listing
-    pub symfile: bool,     // -s
-    pub class_mask: u32,   // -x<xx>, hex, default 1 (5.4 CLASS)
-    pub timing: bool,      // -y, lower case only (1.3)
-    pub debug: bool,       // -z, trace to stderr
-    pub compatibility: bool,      // --compatibility (1.3, 3.1, 4.7)
+    pub quiet: bool,             // -q, suppress the listing
+    pub symfile: bool,           // -s
+    pub class_mask: u32,         // -x<xx>, hex, default 1 (5.4 CLASS)
+    pub timing: bool,            // -y, lower case only (1.3)
+    pub debug: bool,             // -z, trace to stderr
+    pub compatibility: bool,     // --compatibility (1.3, 3.1, 4.7)
     /// --message-prefix: the name on the assembler's own messages. TASM wrote
     /// `tasm:`; reproducing that byte-for-byte is a compatibility concern, so it
     /// is a value rather than a hidden behaviour.
@@ -142,7 +142,10 @@ impl Options {
                 o.files.push(arg.clone());
             } else {
                 // 10.3: non-fatal, the extra name is ignored.
-                warnings.push(format!("too many file names (max {}): {}", MAX_FILE_ARGS, arg));
+                warnings.push(format!(
+                    "too many file names (max {}): {}",
+                    MAX_FILE_ARGS, arg
+                ));
             }
         }
         Parsed { opts: o, warnings }
@@ -235,10 +238,11 @@ impl Options {
             // 1.3: a bare -x enables ALL classes; -x<d> sets the mask to the
             // single hex digit <d>. When -x is absent the mask is 1.
             'x' => {
-                self.class_mask = match rest.chars().next().and_then(|c| c.to_digit(16)) {
-                    Some(d) => d,
-                    None => 0xFF,
-                }
+                self.class_mask = rest
+                    .chars()
+                    .next()
+                    .and_then(|c| c.to_digit(16))
+                    .unwrap_or(0xFF)
             }
             'y' => self.timing = true,
             'z' => self.debug = true,
@@ -306,13 +310,20 @@ mod tests {
     use super::*;
 
     fn opts(args: &[&str]) -> Options {
-        Options::parse(&args.iter().map(|s| s.to_string()).collect::<Vec<_>>(), None).opts
+        Options::parse(
+            &args.iter().map(|s| s.to_string()).collect::<Vec<_>>(),
+            None,
+        )
+        .opts
     }
 
     #[test]
     fn cpu_selects_the_table_and_accepts_alphanumeric_names() {
         assert_eq!(opts(&["--cpu=z80"]).table.as_deref(), Some("z80"));
-        assert_eq!(opts(&["--cpu=tms320c25"]).table.as_deref(), Some("tms320c25"));
+        assert_eq!(
+            opts(&["--cpu=tms320c25"]).table.as_deref(),
+            Some("tms320c25")
+        );
         assert_eq!(opts(&["--cpu=8051"]).table.as_deref(), Some("8051"));
         // The legacy forms still work, undocumented, so one source tree serves
         // both the published branch and the reference comparison.
@@ -324,10 +335,7 @@ mod tests {
     fn candidate_table_paths_are_tried_current_format_first() {
         let o = opts(&["--cpu=z80"]);
         assert_eq!(o.table_paths(None), ["z80.tab2", "tasmz80.tab"]);
-        assert_eq!(
-            o.table_paths(Some("/t")),
-            ["/t/z80.tab2", "/t/tasmz80.tab"]
-        );
+        assert_eq!(o.table_paths(Some("/t")), ["/t/z80.tab2", "/t/tasmz80.tab"]);
         // 1.5: a single directory joined with a literal '/', not a search path.
         assert!(opts(&[]).table_paths(Some("/t")).is_empty());
     }

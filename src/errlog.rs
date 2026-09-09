@@ -216,7 +216,11 @@ fn apply(spec: &str, file: &str, line: u32, message: &str, detail: &str) -> Stri
             i += 1;
         }
         // An absent width is zero, not unbounded.
-        let width: usize = if i > ws { spec[ws..i].parse().unwrap_or(RENDER_LIMIT) } else { 0 };
+        let width: usize = if i > ws {
+            spec[ws..i].parse().unwrap_or(RENDER_LIMIT)
+        } else {
+            0
+        };
         let mut prec: Option<usize> = None;
         if i < b.len() && b[i] == b'.' {
             i += 1;
@@ -276,7 +280,12 @@ mod tests {
     fn default_layout_matches_the_corpus() {
         let f = Format::default_layout();
         assert_eq!(
-            f.render("err-undef.asm", 4, msg::LABEL_NOT_FOUND, Some("no_such_label")),
+            f.render(
+                "err-undef.asm",
+                4,
+                msg::LABEL_NOT_FOUND,
+                Some("no_such_label")
+            ),
             "err-undef.asm line 0004: Label not found: (no_such_label)"
         );
         // A message with no detail still ends in the format's space.
@@ -286,11 +295,21 @@ mod tests {
         );
         // Three messages carry trailing padding to 34 columns.
         assert_eq!(
-            f.render("err-baddir.asm", 4, msg::BAD_DIRECTIVE, Some(".NOTADIRECTIVE")),
+            f.render(
+                "err-baddir.asm",
+                4,
+                msg::BAD_DIRECTIVE,
+                Some(".NOTADIRECTIVE")
+            ),
             "err-baddir.asm line 0004: unrecognized directive.            (.NOTADIRECTIVE)"
         );
         assert_eq!(
-            f.render("err-badinst.asm", 4, msg::BAD_INSTRUCTION, Some("FROBNICATE")),
+            f.render(
+                "err-badinst.asm",
+                4,
+                msg::BAD_INSTRUCTION,
+                Some("FROBNICATE")
+            ),
             "err-badinst.asm line 0004: unrecognized instruction.          (FROBNICATE)"
         );
         assert_eq!(
@@ -302,14 +321,25 @@ mod tests {
     #[test]
     fn accepted_custom_formats_match_the_corpus() {
         for (spec, want) in [
-            ("%s(%d): %s %s", "err-undef.asm(4): Label not found: (no_such_label)"),
+            (
+                "%s(%d): %s %s",
+                "err-undef.asm(4): Label not found: (no_such_label)",
+            ),
             ("%s", "err-undef.asm"),
-            ("%-20s %04d %s%s", "err-undef.asm        0004 Label not found:(no_such_label)"),
+            (
+                "%-20s %04d %s%s",
+                "err-undef.asm        0004 Label not found:(no_such_label)",
+            ),
         ] {
             let (f, warn) = Format::from_env(Some(spec));
             assert!(warn.is_none(), "{} should be accepted", spec);
             assert_eq!(
-                f.render("err-undef.asm", 4, msg::LABEL_NOT_FOUND, Some("no_such_label")),
+                f.render(
+                    "err-undef.asm",
+                    4,
+                    msg::LABEL_NOT_FOUND,
+                    Some("no_such_label")
+                ),
                 want,
                 "format {}",
                 spec
@@ -326,7 +356,12 @@ mod tests {
             let (f, warn) = Format::from_env(Some(spec));
             assert!(warn.is_some(), "{} must be rejected", spec);
             assert_eq!(
-                f.render("err-undef.asm", 4, msg::LABEL_NOT_FOUND, Some("no_such_label")),
+                f.render(
+                    "err-undef.asm",
+                    4,
+                    msg::LABEL_NOT_FOUND,
+                    Some("no_such_label")
+                ),
                 "err-undef.asm line 0004: Label not found: (no_such_label)"
             );
         }
@@ -339,9 +374,17 @@ mod tests {
     fn a_huge_field_width_is_honoured_and_truncated_not_rejected() {
         let (f, warn) = Format::from_env(Some("%99999999s"));
         assert!(warn.is_none(), "a large width is conforming");
-        let out = f.render("err-undef.asm", 4, msg::LABEL_NOT_FOUND, Some("no_such_label"));
+        let out = f.render(
+            "err-undef.asm",
+            4,
+            msg::LABEL_NOT_FOUND,
+            Some("no_such_label"),
+        );
         assert_eq!(out.len(), 510);
-        assert!(out.chars().all(|c| c == ' '), "the name never reaches the buffer");
+        assert!(
+            out.chars().all(|c| c == ' '),
+            "the name never reaches the buffer"
+        );
     }
 
     #[test]

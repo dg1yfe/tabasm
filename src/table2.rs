@@ -24,7 +24,14 @@ use crate::table::{self, LoadError, RegSet, Row, Rule, Table};
 pub const EXPR: u8 = 0x01;
 pub const REG: u8 = 0x02;
 
-const COLUMNS: [&str; 6] = ["mnemonic", "operands", "opcode", "op-bytes", "arg-bytes", "rule"];
+const COLUMNS: [&str; 6] = [
+    "mnemonic",
+    "operands",
+    "opcode",
+    "op-bytes",
+    "arg-bytes",
+    "rule",
+];
 
 /// Every parameter is accepted by exactly the rules that read it.
 const UNIVERSAL: &[&str] = &["class", "post-shift", "post-or"];
@@ -184,7 +191,10 @@ fn pattern(line: usize, text: &str) -> Result<String, LoadError> {
         if !ok {
             return err(
                 line,
-                format!("<expr> before the last must be followed by ',', '[' or ']': {}", text),
+                format!(
+                    "<expr> before the last must be followed by ',', '[' or ']': {}",
+                    text
+                ),
             );
         }
     }
@@ -213,12 +223,10 @@ pub fn parse(text: &str, selector: &str) -> Result<Table, LoadError> {
             let name = it.next().unwrap_or("");
             let args: Vec<&str> = it.collect();
             match name {
-                "format" => {
-                    match args.first().and_then(|s| dec_val(s)) {
-                        Some(2) => seen_format = true,
-                        _ => return err(line, "only %format 2 is supported"),
-                    }
-                }
+                "format" => match args.first().and_then(|s| dec_val(s)) {
+                    Some(2) => seen_format = true,
+                    _ => return err(line, "only %format 2 is supported"),
+                },
                 "banner" => {
                     let joined = rest[name.len()..].trim();
                     match quoted(joined) {
@@ -256,19 +264,31 @@ pub fn parse(text: &str, selector: &str) -> Result<Table, LoadError> {
                     for a in &args[1..] {
                         let (k, v) = match a.split_once('=') {
                             Some(kv) => kv,
-                            None => return err(line, format!("%regset: expected key=value, got {}", a)),
+                            None => {
+                                return err(line, format!("%regset: expected key=value, got {}", a))
+                            }
                         };
                         match k {
-                            "mask" => mask = hex_val(v).ok_or(LoadError::Syntax(line, "bad mask".into()))?,
+                            "mask" => {
+                                mask =
+                                    hex_val(v).ok_or(LoadError::Syntax(line, "bad mask".into()))?
+                            }
                             "class" => class = resolve_class(line, v, &classes)?,
                             _ => return err(line, format!("%regset has no parameter {}", k)),
                         }
                     }
-                    t.regsets.push(RegSet { name: nm, mask, class });
+                    t.regsets.push(RegSet {
+                        name: nm,
+                        mask,
+                        class,
+                    });
                 }
                 "columns" => {
                     if args.len() != COLUMNS.len() {
-                        return err(line, format!("%columns needs exactly {}: {:?}", COLUMNS.len(), COLUMNS));
+                        return err(
+                            line,
+                            format!("%columns needs exactly {}: {:?}", COLUMNS.len(), COLUMNS),
+                        );
                     }
                     for c in &args {
                         if !COLUMNS.contains(c) {
@@ -329,21 +349,39 @@ fn resolve_class(line: usize, v: &str, classes: &[(String, u32)]) -> Result<u32,
     hex_val(v).ok_or(LoadError::Syntax(line, format!("unknown class {}", v)))
 }
 
-fn row(line: usize, body: &str, cols: &[String], classes: &[(String, u32)]) -> Result<Row, LoadError> {
+fn row(
+    line: usize,
+    body: &str,
+    cols: &[String],
+    classes: &[(String, u32)],
+) -> Result<Row, LoadError> {
     let f: Vec<&str> = body.split_whitespace().collect();
     if f.len() < cols.len() {
-        return err(line, format!("expected {} columns, found {}", cols.len(), f.len()));
+        return err(
+            line,
+            format!("expected {} columns, found {}", cols.len(), f.len()),
+        );
     }
     // Anything past the declared columns must be a rule parameter, which is what
     // makes a miscounted row an error instead of a silent shift.
     for extra in &f[cols.len()..] {
         if !extra.contains('=') {
-            return err(line, format!("expected {} columns, found extra field {}", cols.len(), extra));
+            return err(
+                line,
+                format!(
+                    "expected {} columns, found extra field {}",
+                    cols.len(),
+                    extra
+                ),
+            );
         }
     }
 
     let get = |name: &str| -> &str {
-        cols.iter().position(|c| c == name).map(|i| f[i]).unwrap_or("")
+        cols.iter()
+            .position(|c| c == name)
+            .map(|i| f[i])
+            .unwrap_or("")
     };
     let mnemonic = get("mnemonic").to_ascii_uppercase();
     let operands = get("operands").to_string();
@@ -358,19 +396,34 @@ fn row(line: usize, body: &str, cols: &[String], classes: &[(String, u32)]) -> R
     };
     let op_bytes = match dec_val(&op_bytes_text) {
         Some(v) if (1..=4).contains(&v) => v as u8,
-        _ => return err(line, format!("op-bytes must be 1..4, found {}", op_bytes_text)),
+        _ => {
+            return err(
+                line,
+                format!("op-bytes must be 1..4, found {}", op_bytes_text),
+            )
+        }
     };
     // v1 derives the opcode width from the digit count, so `0` and `00` differ.
     // Here both are stated and must agree.
     if opcode_text.len() != op_bytes as usize * 2 {
         return err(
             line,
-            format!("op-bytes {} disagrees with a {}-digit opcode {}", op_bytes, opcode_text.len(), opcode_text),
+            format!(
+                "op-bytes {} disagrees with a {}-digit opcode {}",
+                op_bytes,
+                opcode_text.len(),
+                opcode_text
+            ),
         );
     }
     let arg_bytes = match dec_val(&arg_bytes_text) {
         Some(v) if v <= 8 => v as u8,
-        _ => return err(line, format!("arg-bytes must be 0..8, found {}", arg_bytes_text)),
+        _ => {
+            return err(
+                line,
+                format!("arg-bytes must be 0..8, found {}", arg_bytes_text),
+            )
+        }
     };
     let rule = match rule_for(&rule_text) {
         Some(r) => r,
@@ -426,7 +479,10 @@ fn row(line: usize, body: &str, cols: &[String], classes: &[(String, u32)]) -> R
 }
 
 fn need_hex(line: usize, k: &str, v: &str) -> Result<u32, LoadError> {
-    hex_val(v).ok_or(LoadError::Syntax(line, format!("{} is not hexadecimal: {}", k, v)))
+    hex_val(v).ok_or(LoadError::Syntax(
+        line,
+        format!("{} is not hexadecimal: {}", k, v),
+    ))
 }
 
 /// Render an internal pattern back to v2 source, for diagnostics and for the
@@ -454,7 +510,10 @@ pub fn display(args: &str) -> String {
 pub fn render(t: &Table, banner: Option<&str>) -> String {
     let mut s = String::new();
     s.push_str("%format         2\n");
-    s.push_str(&format!("%banner         \"{}\"\n", banner.unwrap_or(&t.banner)));
+    s.push_str(&format!(
+        "%banner         \"{}\"\n",
+        banner.unwrap_or(&t.banner)
+    ));
     s.push_str(&format!(
         "%opcode-order   {}\n",
         if t.msfirst { "ms-first" } else { "ls-first" }
@@ -536,12 +595,35 @@ pub fn render(t: &Table, banner: Option<&str>) -> String {
 
 pub fn name_for(rule: Rule) -> &'static str {
     for n in [
-        "plain", "jmp-page-2k", "jmp-page-256", "rel8", "zero-page", "zero-page-moto",
-        "bit-moto", "bit-z80", "index-z80", "combine", "combine-rel", "combine-swapped",
-        "swap-bytes", "three-rel", "tms-fold", "tms-dma", "tms-long", "tms-long-swapped",
-        "tms-aux", "tms7000-trap", "rel16", "i8096-combine", "i8096-short-long-2",
-        "i8096-short-long-3", "i8096-jump-bit", "i8096-rel11", "i8096-indexed",
-        "i8096-short-long-1", "i8096-combine-swapped",
+        "plain",
+        "jmp-page-2k",
+        "jmp-page-256",
+        "rel8",
+        "zero-page",
+        "zero-page-moto",
+        "bit-moto",
+        "bit-z80",
+        "index-z80",
+        "combine",
+        "combine-rel",
+        "combine-swapped",
+        "swap-bytes",
+        "three-rel",
+        "tms-fold",
+        "tms-dma",
+        "tms-long",
+        "tms-long-swapped",
+        "tms-aux",
+        "tms7000-trap",
+        "rel16",
+        "i8096-combine",
+        "i8096-short-long-2",
+        "i8096-short-long-3",
+        "i8096-jump-bit",
+        "i8096-rel11",
+        "i8096-indexed",
+        "i8096-short-long-1",
+        "i8096-combine-swapped",
     ] {
         if rule_for(n) == Some(rule) {
             return n;
@@ -554,7 +636,19 @@ pub fn name_for(rule: Rule) -> &'static str {
 mod tests {
     use super::*;
 
-    const TABLES: [&str; 11] = ["6502", "6800", "6805", "8048", "8051", "8085", "8096", "tms32010", "tms320c25", "tms7000", "z80"];
+    const TABLES: [&str; 11] = [
+        "6502",
+        "6800",
+        "6805",
+        "8048",
+        "8051",
+        "8085",
+        "8096",
+        "tms32010",
+        "tms320c25",
+        "tms7000",
+        "z80",
+    ];
 
     /// The round trip: load each shipped table, render it, parse the result, and
     /// require the two `Table` values to be equivalent. Rendering and parsing
@@ -562,7 +656,9 @@ mod tests {
     #[test]
     fn every_shipped_table_survives_a_round_trip_through_v2() {
         for sel in TABLES {
-            let v1 = Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap();
+            let v1 = Table::load(&format!("tables/{}.tab2", sel), sel)
+                .ok()
+                .unwrap();
             let text = render(&v1, None);
             let v2 = match parse(&text, sel) {
                 Ok(t) => t,
@@ -575,10 +671,24 @@ mod tests {
             assert_eq!(v1.banner, v2.banner, "tasm{} banner", sel);
             assert_eq!(v1.msfirst, v2.msfirst, "tasm{} opcode order", sel);
             assert_eq!(v1.wordaddrs, v2.wordaddrs, "tasm{} address unit", sel);
-            assert_eq!(v1.aux_registers, v2.aux_registers, "tasm{} aux registers", sel);
-            assert_eq!(v1.regsets.len(), v2.regsets.len(), "tasm{} regset count", sel);
+            assert_eq!(
+                v1.aux_registers, v2.aux_registers,
+                "tasm{} aux registers",
+                sel
+            );
+            assert_eq!(
+                v1.regsets.len(),
+                v2.regsets.len(),
+                "tasm{} regset count",
+                sel
+            );
             for (a, b) in v1.regsets.iter().zip(&v2.regsets) {
-                assert_eq!((&a.name, a.mask, a.class), (&b.name, b.mask, b.class), "tasm{}", sel);
+                assert_eq!(
+                    (&a.name, a.mask, a.class),
+                    (&b.name, b.mask, b.class),
+                    "tasm{}",
+                    sel
+                );
             }
             assert_eq!(v1.rows.len(), v2.rows.len(), "tasm{} row count", sel);
 
@@ -611,7 +721,9 @@ mod tests {
     #[test]
     fn no_shipped_row_carries_an_unreachable_shift_or_mask() {
         for sel in TABLES {
-            let t = Table::load(&format!("tables/{}.tab2", sel), sel).ok().unwrap();
+            let t = Table::load(&format!("tables/{}.tab2", sel), sel)
+                .ok()
+                .unwrap();
             for r in &t.rows {
                 if params_for(r.rule).is_empty() && r.post_shift == 0 && r.post_or == 0 {
                     assert_eq!(
@@ -622,7 +734,11 @@ mod tests {
                         r.mnemonic
                     );
                 }
-                assert!(!r.short_count, "tasm{} {} has a short byte count", sel, r.mnemonic);
+                assert!(
+                    !r.short_count,
+                    "tasm{} {} has a short byte count",
+                    sel, r.mnemonic
+                );
             }
         }
     }
@@ -643,14 +759,22 @@ mod diagnostics {
     }
 
     fn ok(body: &str) -> Row {
-        parse(&format!("{}{}", HEAD, body), "51").ok().unwrap().rows.remove(0)
+        parse(&format!("{}{}", HEAD, body), "51")
+            .ok()
+            .unwrap()
+            .rows
+            .remove(0)
     }
 
     /// The v1 defect of §7.19: a row missing a column shifted every later field
     /// and registered silently. Here it names the line.
     #[test]
     fn a_missing_column_is_an_error_naming_the_line() {
-        assert!(fails("IM0 46ED 2 plain\n").contains("expected 6 columns"), "{}", fails("IM0 46ED 2 plain\n"));
+        assert!(
+            fails("IM0 46ED 2 plain\n").contains("expected 6 columns"),
+            "{}",
+            fails("IM0 46ED 2 plain\n")
+        );
         assert!(fails("NOP - 00 1 0 plain junk\n").contains("extra field junk"));
     }
 
@@ -677,8 +801,13 @@ mod diagnostics {
     #[test]
     fn a_parameter_the_rule_does_not_read_is_an_error() {
         assert!(fails("NOP - 00 1 0 plain page-mask=F800\n").contains("has no parameter"));
-        assert!(fails("ACALL <expr> 11 1 1 jmp-page-2k valid-mask=7F\n").contains("has no parameter"));
-        assert_eq!(ok("ACALL <expr> 11 1 1 jmp-page-2k page-mask=F800\n").or, 0xF800);
+        assert!(
+            fails("ACALL <expr> 11 1 1 jmp-page-2k valid-mask=7F\n").contains("has no parameter")
+        );
+        assert_eq!(
+            ok("ACALL <expr> 11 1 1 jmp-page-2k page-mask=F800\n").or,
+            0xF800
+        );
         // The post-rule transform is universal, and lands in its own fields.
         let r = ok("BIT <expr>,(HL) 46CB 2 0 bit-z80 post-or=4600\n");
         assert_eq!((r.post_or, r.or), (0x4600, 0));
@@ -690,7 +819,11 @@ mod diagnostics {
     fn a_non_final_capture_needs_a_delimiter() {
         assert!(fails("FOO <expr><expr> 00 1 0 plain\n").contains("must be followed by"));
         assert!(parse(&format!("{}FOO <expr>,<expr> 00 1 0 plain\n", HEAD), "51").is_ok());
-        assert!(parse(&format!("{}FOO A,#<expr>,<expr> 00 1 0 plain\n", HEAD), "51").is_ok());
+        assert!(parse(
+            &format!("{}FOO A,#<expr>,<expr> 00 1 0 plain\n", HEAD),
+            "51"
+        )
+        .is_ok());
     }
 
     /// §5.6: order is significant and the first match wins, so a repeated
@@ -701,7 +834,10 @@ mod diagnostics {
         assert!(e.contains("unreachable row"), "{}", e);
         // A different class does not collide.
         assert!(parse(
-            &format!("{}%class 2 ext\nADD A,<expr> 25 1 1 plain\nADD A,<expr> 26 1 1 plain class=2\n", HEAD),
+            &format!(
+                "{}%class 2 ext\nADD A,<expr> 25 1 1 plain\nADD A,<expr> 26 1 1 plain class=2\n",
+                HEAD
+            ),
             "51"
         )
         .is_ok());
@@ -710,10 +846,22 @@ mod diagnostics {
     #[test]
     fn the_header_is_validated() {
         assert!(parse("%format 3\n", "51").is_err());
-        assert!(parse("NOP - 00 1 0 plain\n", "51").is_err(), "a row before %format");
-        assert!(parse("%format 2\nNOP - 00 1 0 plain\n", "51").is_err(), "a row before %columns");
-        assert!(parse("%format 2\n%wildcard @\n", "51").is_err(), "no %wildcard in v2");
-        assert!(parse("%format 2\n%aux-registers 3\n", "51").is_err(), "not a power of two");
+        assert!(
+            parse("NOP - 00 1 0 plain\n", "51").is_err(),
+            "a row before %format"
+        );
+        assert!(
+            parse("%format 2\nNOP - 00 1 0 plain\n", "51").is_err(),
+            "a row before %columns"
+        );
+        assert!(
+            parse("%format 2\n%wildcard @\n", "51").is_err(),
+            "no %wildcard in v2"
+        );
+        assert!(
+            parse("%format 2\n%aux-registers 3\n", "51").is_err(),
+            "not a power of two"
+        );
     }
 
     /// `;` is the comment leader precisely because `#` is the immediate prefix.
@@ -774,11 +922,20 @@ mod diagnostics {
         let odd = dir.join("tasm78.tab");
         std::fs::write(&odd, "; a v2 table under a legacy name\n%format 2\n%banner \"sniffed\"\n%columns mnemonic operands opcode op-bytes arg-bytes rule\nNOP - 00 1 0 plain\n").unwrap();
         let one = vec![odd.to_string_lossy().into()];
-        assert_eq!(Table::load_first(&one, "78").ok().unwrap().banner, "sniffed");
+        assert_eq!(
+            Table::load_first(&one, "78").ok().unwrap().banner,
+            "sniffed"
+        );
 
         // Nothing present at all is an Open error naming the first candidate.
-        let missing = vec!["/nonexistent/99.tab2".to_string(), "/nonexistent/tasm99.tab".to_string()];
-        assert!(matches!(Table::load_first(&missing, "99"), Err(LoadError::Open(_))));
+        let missing = vec![
+            "/nonexistent/99.tab2".to_string(),
+            "/nonexistent/tasm99.tab".to_string(),
+        ];
+        assert!(matches!(
+            Table::load_first(&missing, "99"),
+            Err(LoadError::Open(_))
+        ));
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
