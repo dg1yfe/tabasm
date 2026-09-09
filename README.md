@@ -4,10 +4,10 @@ A table-driven, two-pass, absolute cross-assembler for 8- and early-16-bit
 microprocessors. Eleven targets are supported out of the box, and adding another
 usually means writing a table rather than changing the program.
 
-tabasm is an independent reimplementation of **TASM**, a table-driven assembler
-first published in the 1980s. It reproduces TASM's output byte for byte where
-asked to, corrects two of its defects by default, and adds a table format that
-says what it means.
+tabasm is an independent reimplementation of the **Telemark Assembler (TASM)**,
+a table-driven cross-assembler first released in 1985. It reproduces TASM's
+output byte for byte where asked to, corrects two of its defects by default, and
+adds a table format that says what it means.
 
 ## Building
 
