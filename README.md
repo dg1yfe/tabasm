@@ -35,14 +35,28 @@ legacy table in the current format, is built from this repository; the
 assembler reads legacy tables directly, so converting one is a choice rather
 than a requirement.
 
-## Building
+## Building and installing from source
 
 ```
-cargo build --release          # target/release/tabasm
-make -C src                    # or a binary at src/tabasm
+make                           # build
+sudo make install              # to /usr/local
+sudo make uninstall
 ```
 
-Rust, no dependencies, no `unsafe` code.
+`make install` puts the assembler in `$PREFIX/bin` and the tables in
+`$PREFIX/share/tabasm/tables`, which is where it looks for them, so nothing
+needs setting afterwards. The man page and documentation go alongside.
+`PREFIX` defaults to `/usr/local`; `DESTDIR` stages the whole install under
+another root without touching the real filesystem:
+
+```
+make install PREFIX=/usr DESTDIR=/tmp/stage
+```
+
+Rust, no dependencies, no `unsafe` code. `make` is a thin wrapper over
+`cargo build --release`, which works on its own if you prefer it. `make -C src`
+is a separate thing again: it drops a binary at `src/tabasm`, where the test
+harness looks for it.
 
 ## Using it
 
@@ -83,6 +97,9 @@ sudo cp tabasm /usr/local/bin/
 sudo mkdir -p /usr/local/share/tabasm && sudo cp -r tables /usr/local/share/tabasm/
 sudo cp doc/tabasm.1 /usr/local/share/man/man1/
 ```
+
+The archive contains no build system, so `make install` is for a source
+checkout rather than a download.
 
 ### Targets
 

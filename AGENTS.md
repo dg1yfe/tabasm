@@ -19,8 +19,11 @@ Three properties shape everything else:
 
 ## Language and build
 
-Rust, no dependencies, no `unsafe`. `cargo build --release`, or `make -C src` for
-a binary at a fixed path. `cargo test` runs everything.
+Rust, no dependencies, no `unsafe`. `make` builds, `make install` installs to
+`$PREFIX` with the tables where the assembler looks for them, and `DESTDIR`
+stages that under another root. `cargo build --release` does the build on its
+own; `make -C src` is the wrapper that drops a binary where the test harness
+looks. `cargo test` runs everything.
 
 ## Style
 
