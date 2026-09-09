@@ -87,7 +87,6 @@ struct Listed {
     line_no: u32,
     addr: u32,
     bytes: Vec<u8>,
-    source: String,
 }
 
 fn read_listing(text: &str) -> Vec<Listed> {
@@ -113,7 +112,7 @@ fn read_listing(text: &str) -> Vec<Listed> {
             Some(prev) if prev.line_no == line_no && source.is_empty() => {
                 prev.bytes.extend(bytes);
             }
-            _ => out.push(Listed { line_no, addr, bytes, source }),
+            _ => out.push(Listed { line_no, addr, bytes }),
         }
     }
     out
