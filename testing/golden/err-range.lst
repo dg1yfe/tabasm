@@ -2,7 +2,7 @@
 0002   0000             ; The target here is far outside that window, exercising the range check in
 0003   0000             ; the PC-relative encoding rule (R1).
 0004   0000                     .org  0
-/Users/eligs/projects/tabasm/testing/cases/err-range.asm line 0005: Range of relative branch exceeded. 
+err-range.asm line 0005: Range of relative branch exceeded. 
 0005   0000 80 00               sjmp  faraway
 0006   0200                     .org  200h
 0007   0200             faraway:

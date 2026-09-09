@@ -31,7 +31,7 @@
 0031   0001 68 81               LARP  1
 0032   0002             
 0033   0002             ; Table-driven mask (T1). Out of range for the 32010's 1-bit field.
-/Users/eligs/projects/tabasm/testing/cases/tms-arp-width.asm line 0034: Range of argument exceeded. (2)
+tms-arp-width.asm line 0034: Range of argument exceeded. (2)
 0034   0002 68 80               LARP  2
 0035   0003             
 0036   0003             ; Selector-driven ARP width (TAR). AR0 and AR1 suit both parts.
@@ -39,9 +39,9 @@
 0038   0004 39 0B               LAR   1,11
 0039   0005             
 0040   0005             ; Selector-driven ARP width (TAR). AR5 and AR7 need the C25.
-/Users/eligs/projects/tabasm/testing/cases/tms-arp-width.asm line 0041: Range of ARP argument exceeded. (5)
+tms-arp-width.asm line 0041: Range of ARP argument exceeded. (5)
 0041   0005 39 0C               LAR   5,12
-/Users/eligs/projects/tabasm/testing/cases/tms-arp-width.asm line 0042: Range of ARP argument exceeded. (7)
+tms-arp-width.asm line 0042: Range of ARP argument exceeded. (7)
 0042   0006 39 0D               LAR   7,13
 0043   0007             
 0044   0007                     .end

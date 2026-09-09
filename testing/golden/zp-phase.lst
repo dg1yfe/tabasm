@@ -20,7 +20,7 @@
 0020   1005             ; Forward reference to a zero-page address: the passes disagree.
 0021   1005 A5 21               lda   fwd
 0022   1007 EA          after   nop
-/Users/eligs/projects/tabasm/testing/cases/zp-phase.asm line 0022: label value misalligned.           (after)
+zp-phase.asm line 0022: label value misalligned.           (after)
 0023   1008             fwd     .equ  21h
 0024   1008             faraway .equ  1234h
 0025   1008             

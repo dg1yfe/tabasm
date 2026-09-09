@@ -6,6 +6,6 @@
 0006   0000                     .org  0
 0007   0000 00                  nop
 0008   0001 00                  nop
-/Users/eligs/projects/tabasm/testing/cases/end-bigaddr.asm line 0009: END address out of range. (12345h)
+end-bigaddr.asm line 0009: END address out of range. (12345h)
 0009   0002                     .end  12345h
 tabasm: Number of errors = 1

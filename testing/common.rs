@@ -47,6 +47,26 @@ impl Drop for Scratch {
     }
 }
 
+/// Copy a source into the scratch directory and return the bare file name to
+/// put on the command line, so nothing in the output depends on where this
+/// checkout lives.
+fn local_copy(source: &str, scratch: &Scratch) -> String {
+    let from = if Path::new(source).is_absolute() {
+        PathBuf::from(source)
+    } else {
+        root().join(source)
+    };
+    let name = from
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or_else(|| "input.asm".to_string());
+    let to = scratch.path(&name);
+    if from != to {
+        std::fs::copy(&from, &to).unwrap_or_else(|e| panic!("copy {}: {}", from.display(), e));
+    }
+    name
+}
+
 /// Everything one assembly produced.
 pub struct Run {
     pub obj: Option<Vec<u8>>,
@@ -80,12 +100,13 @@ impl Run {
 
 /// Assemble `source` with `args`, writing the five positional outputs into
 /// `scratch`. `source` is relative to the repository root unless absolute.
+///
+/// The source is copied into the scratch directory and named on the command
+/// line without a path. Diagnostics and the paged-listing heading both quote the
+/// name they were given, so passing an absolute one would bake this checkout's
+/// location into every recorded artefact.
 pub fn assemble(args: &[&str], source: &str, scratch: &Scratch, env: &[(&str, &str)]) -> Run {
-    let src = if Path::new(source).is_absolute() {
-        PathBuf::from(source)
-    } else {
-        root().join(source)
-    };
+    let src = local_copy(source, scratch);
     let names = ["a.obj", "a.lst", "a.exp", "a.sym"];
     let mut cmd = Command::new(TABASM);
     cmd.current_dir(&scratch.0);
@@ -134,11 +155,7 @@ pub fn assemble_bounded(
     env: &[(&str, &str)],
     limit: std::time::Duration,
 ) -> Option<Run> {
-    let src = if Path::new(source).is_absolute() {
-        PathBuf::from(source)
-    } else {
-        root().join(source)
-    };
+    let src = local_copy(source, scratch);
     let mut cmd = Command::new(TABASM);
     cmd.current_dir(&scratch.0)
         .env("TASMTABS", root().join("tables"))

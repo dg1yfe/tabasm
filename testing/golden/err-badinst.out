@@ -1,7 +1,7 @@
 tabasm 0.1.0 -- table-driven cross-assembler.
  Clean-room reimplementation from the TASM behavioural specification.
 tabasm: pass 1 complete.
-/Users/eligs/projects/tabasm/testing/cases/err-badinst.asm line 0004: unrecognized instruction.          (FROBNICATE)
-/Users/eligs/projects/tabasm/testing/cases/err-badinst.asm line 0006: unrecognized instruction.          (WIBBLE)
+err-badinst.asm line 0004: unrecognized instruction.          (FROBNICATE)
+err-badinst.asm line 0006: unrecognized instruction.          (WIBBLE)
 tabasm: pass 2 complete.
 tabasm: Number of errors = 2

@@ -2,7 +2,7 @@
 0002   0000             ; Exercises the "bad directive" / "bad argument" diagnostics.
 0003   0000                     .org  0
 0004   0000                     .notadirective
-/Users/eligs/projects/tabasm/testing/cases/err-baddir.asm line 0004: unrecognized directive.            (.NOTADIRECTIVE)
+err-baddir.asm line 0004: unrecognized directive.            (.NOTADIRECTIVE)
 0005   0000 00                  .byte
 0006   0001 00                  nop
 0007   0002                     .end

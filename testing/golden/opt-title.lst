@@ -1,4 +1,4 @@
-Table-driven 8051 Assembler       /Users/eligs/projects/tabasm/testing/smoke/8051.asmpage 1
+Table-driven 8051 Assembler       8051.asm                         page 1
 Some Title                        
 
 0001   0000             ; 8051 smoke test.
@@ -17,7 +17,7 @@ Some Title
 0013   000B 38                  ADDC  A,R0
 0014   000C 58                  ANL   A,R0
 0015   000D E4                  CLR   A
-Table-driven 8051 Assembler       /Users/eligs/projects/tabasm/testing/smoke/8051.asmpage 2
+Table-driven 8051 Assembler       8051.asm                         page 2
 Some Title                        
 
 0016   000E F4                  CPL   A
