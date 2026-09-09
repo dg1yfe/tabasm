@@ -23,16 +23,8 @@ brew trust dg1yfe/tap
 brew install dg1yfe/tap/tabasm
 ```
 
-The first line is not optional: Homebrew 6 refuses to load formulae from a
-third-party tap until it is trusted, and the failure reports *invalid syntax in
-tap*, which points at the formula rather than at the trust setting.
-
-Homebrew is macOS only here; on Linux, take the release tarball.
-
-The release archives carry the assembler alone. `tab1to2`, which rewrites a
-legacy table in the current format, is built from this repository; the
-assembler reads legacy tables directly, so converting one is a choice rather
-than a requirement.
+Without `brew trust`, tapping fails with *invalid syntax in tap* — a misleading
+error; the formula is fine. macOS only; on Linux take the tarball.
 
 ## Building and installing from source
 
@@ -42,18 +34,16 @@ sudo make install              # to /usr/local
 sudo make uninstall
 ```
 
-`make install` puts the assembler in `$PREFIX/bin` and the tables in
-`$PREFIX/share/tabasm/tables`, which is where it looks for them, so nothing
-needs setting afterwards. The man page and documentation go alongside.
-`PREFIX` defaults to `/usr/local`; `DESTDIR` stages the whole install under
-another root without touching the real filesystem:
+Installs the assembler to `$PREFIX/bin`, the tables to
+`$PREFIX/share/tabasm/tables` where it looks for them, and the man page and docs
+alongside. `PREFIX` defaults to `/usr/local`. `DESTDIR` stages the install
+elsewhere, for packaging:
 
 ```
 make install PREFIX=/usr DESTDIR=/tmp/stage
 ```
 
-Rust, no dependencies, no `unsafe` code. `make` is a thin wrapper over
-`cargo build --release`, which works on its own if you prefer it.
+Rust, no dependencies, no `unsafe`. `make` wraps `cargo build --release`.
 
 ## Using it
 
@@ -83,20 +73,16 @@ Each name is a file, so the assembler has to locate it. It tries, in order:
 6. `/usr/local/share/tabasm/tables`, then `/usr/share/tabasm/tables`;
    `%ProgramFiles%\tabasm\tables` on Windows.
 
-The first two are the whole of the original's behaviour, in its order, so
-nothing that resolves today resolves differently. If no table is found, the
-error lists every path tried.
+The first two are the original's entire behaviour, in its order. If no table is
+found, the error lists every path tried.
 
-To install from a release archive:
+To install from a release archive, which carries no build system:
 
 ```
 sudo cp tabasm /usr/local/bin/
 sudo mkdir -p /usr/local/share/tabasm && sudo cp -r tables /usr/local/share/tabasm/
 sudo cp doc/tabasm.1 /usr/local/share/man/man1/
 ```
-
-The archive contains no build system, so `make install` is for a source
-checkout rather than a download.
 
 ### Targets
 
@@ -118,6 +104,22 @@ checkout rather than a download.
 Each name is the table's file name: `--cpu z80` reads `z80.tab2`. Write your own
 and it is selectable the same way, with no change to the assembler.
 
+### Table formats
+
+Two are read. `<name>.tab2` is the current one, described in
+`doc/table-format.md`. TASM's own `tasm<name>.tab` is read directly and tried in
+every directory searched, so existing tables work unchanged —
+`doc/table-format-legacy.md` describes that format.
+
+Converting is therefore optional. `tab1to2` does it if you want the current
+format's comments and named rules:
+
+```
+tab1to2 tasm51.tab 8051.tab2 "Table-driven 8051 Assembler"
+```
+
+It is built from a source checkout, not shipped in the release archives.
+
 ### Output formats
 
 `-g0` Intel HEX (default) · `-g1` MOS Technology · `-g2` Motorola S-record ·
@@ -135,43 +137,24 @@ binary operator.
 
 ## Compatibility with TASM
 
-Three switches exist for it, and they are independent because they answer
-different questions.
-
-**`--compatibility`** restores two behaviours the original had and this one does
-not. Its expression evaluator had no operator precedence — everything bound
-equally, left to right, so `1+2*3+4` was 13 rather than 11. And `.UNDEF` was
-listed as a directive but implemented in neither pass, so it silently kept the
-macro it claimed to remove, and a later `#ifdef` took the branch the author did
-not intend.
-
-**`--bug-compatibility`** restores two defects that this assembler fixes.
-
-- The `-g4` word-address checksum was computed from the *byte* address while the
-  record printed the *word* address, so the two disagreed whenever the address was
-  non-zero. Such records fail validation in any conforming Intel HEX loader:
-  assembling a 17-record file that way produces 15 invalid records. By default the
-  checksum matches the address printed.
-- The symbol table was ordered by a shaker sort keyed on the first character
-  whose bookkeeping stopped early, so for some inputs the label table came out not
-  quite sorted. By default the ordering is a full lexical sort, which is what a
-  symbol list is for.
-
-**`--message-prefix`** and **`--page-title`** set the name on the assembler's own
-messages and the paged-listing heading. They are values rather than a mode because
-matching another tool's output is a legitimate thing to ask for and an odd thing
-to hide.
-
-So to reproduce TASM's output exactly:
+To reproduce TASM's output exactly:
 
 ```
 tabasm --compatibility --bug-compatibility --message-prefix tasm --cpu 8051 x.asm
 ```
 
-`tabasm --help` prints the options. `man tabasm` is the full reference, and
-`doc/` documents both table formats.
+| switch | restores |
+|---|---|
+| `--compatibility` | no operator precedence, so `1+2*3+4` is 13, not 11; `.UNDEF` does nothing |
+| `--bug-compatibility` | the `-g4` checksum taken from the byte address while the record prints the word address; the symbol sort that stops early |
+| `--message-prefix`, `--page-title` | the name on messages and the paged-listing heading |
 
-There is no `-h` for help: `-h` appends a hex dump to the listing, as it did
+The two defects are corrected by default: `-g4` records that disagree with their
+own address fail validation in any conforming Intel HEX loader, and a symbol
+list is sorted lexically.
+
+`tabasm --help` lists the options; `man tabasm` is the full reference; `doc/`
+covers both table formats. There is no `-h` for help — `-h` is the hex dump, as
 in the original.
 
 ## Testing
@@ -180,28 +163,25 @@ in the original.
 cargo test
 ```
 
-Four suites, no dependencies to install:
+Four suites, nothing to install:
 
-- **unit tests** over the expression evaluator, the matcher, the encoding rules,
-  the object writers and the table parsers;
-- **`testing/conformance.rs`** — whether the output is *right*. It sweeps all 3028
-  rows of the twelve tables, requiring each to be reachable and to encode as the
-  table declares; re-derives every object checksum rather than remembering it;
-  cross-checks the object file against the listing; and checks the documented
-  expression values. It shares no code with `src/` on purpose;
-- **`testing/golden.rs`** — whether the output is *unchanged*, over 115 recorded
-  cases;
-- **`testing/robustness.rs`** — hostile sources, tables, command lines and
-  environment variables must not crash or hang it.
+- **unit tests** — evaluator, matcher, encoding rules, object writers, table
+  parsers;
+- **`conformance.rs`** — whether the output is *right*: sweeps all 3028 table
+  rows for reachability and declared encoding, re-derives every checksum, and
+  cross-checks object against listing. Shares no code with `src/`, deliberately;
+- **`golden.rs`** — whether the output is *unchanged*, against recorded output;
+- **`robustness.rs`** — hostile sources, tables, arguments and environment must
+  not crash or hang it.
 
-CI runs the suites on Linux, macOS and Windows, along with an overflow-checked
-build, `rustfmt`, `clippy` and the minimum supported Rust version. Because the
-recorded output was captured on one machine, running it on three is how the
-project checks that the assembler emits identical bytes everywhere.
+CI runs all four on Linux, macOS and Windows, plus an overflow-checked build,
+`rustfmt`, `clippy` and the declared minimum Rust version. The recorded output
+was captured on one machine, so three platforms is how identical bytes
+everywhere gets checked.
 
-During development the assembler was also compared directly against the original
-release, over 363 artefacts across eleven processors and twelve output variants.
-That comparison needs the original binary and is not part of this repository.
+The assembler was also compared directly against the original release during
+development — 363 artefacts, eleven processors, twelve output variants. That
+needs the original binary and is not in this repository.
 
 ## Licence
 
