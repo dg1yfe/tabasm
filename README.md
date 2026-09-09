@@ -55,6 +55,7 @@ To install from a release archive:
 ```
 sudo cp tabasm tab1to2 /usr/local/bin/
 sudo mkdir -p /usr/local/share/tabasm && sudo cp -r tables /usr/local/share/tabasm/
+sudo cp doc/tabasm.1 /usr/local/share/man/man1/
 ```
 
 ### Targets

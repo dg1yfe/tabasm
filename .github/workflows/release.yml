@@ -62,12 +62,21 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # Statically linked against musl, so it runs on any Linux however
-          # old its glibc. Nothing here dlopens or looks up users, which is
-          # where static musl would otherwise bite.
-          - { os: ubuntu-latest,  name: x86_64-linux,    target: x86_64-unknown-linux-musl, ext: tar.gz }
-          - { os: macos-latest,   name: universal-macos, target: '',                        ext: tar.gz }
-          - { os: windows-latest, name: x86_64-windows,  target: '',                        ext: zip }
+          # Every Linux build is statically linked against musl, so it runs on
+          # any distribution however old its glibc, and needs no cross libc to
+          # build: rust-lld links them all. Nothing here dlopens or looks up
+          # users, which is where static musl would otherwise bite.
+          #
+          # The ARM targets cover the Raspberry Pi range: aarch64 for the
+          # 64-bit OS that is now the default on Pi 3 and later, armv7 for the
+          # 32-bit OS, and armv6 for the Pi 1 and Zero, which are ARMv6 and
+          # cannot run armv7 code.
+          - { os: ubuntu-latest,  name: x86_64-linux,    target: x86_64-unknown-linux-musl,      ext: tar.gz, qemu: '' }
+          - { os: ubuntu-latest,  name: aarch64-linux,   target: aarch64-unknown-linux-musl,     ext: tar.gz, qemu: qemu-aarch64-static }
+          - { os: ubuntu-latest,  name: armv7-linux,     target: armv7-unknown-linux-musleabihf, ext: tar.gz, qemu: qemu-arm-static }
+          - { os: ubuntu-latest,  name: armv6-linux,     target: arm-unknown-linux-musleabihf,   ext: tar.gz, qemu: qemu-arm-static }
+          - { os: macos-latest,   name: universal-macos, target: '',                             ext: tar.gz, qemu: '' }
+          - { os: windows-latest, name: x86_64-windows,  target: '',                             ext: zip,    qemu: '' }
     steps:
       - uses: actions/checkout@v4
         with: { ref: '${{ github.event.inputs.tag || github.ref_name }}' }
@@ -90,20 +99,32 @@ jobs:
               lipo -info "out/$b"
             done
           elif [ -n "${{ matrix.target }}" ]; then
-            sudo apt-get update && sudo apt-get install -y musl-tools
             rustup target add ${{ matrix.target }}
+            # rust-lld links every musl target without a cross toolchain,
+            # which is the whole reason the ARM builds need no sysroot. It
+            # ships with the toolchain but is not on PATH, so put it there.
+            export PATH="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin:$PATH"
+            command -v rust-lld >/dev/null || { echo 'rust-lld not found' >&2; exit 1; }
+            t=$(echo '${{ matrix.target }}' | tr 'a-z-' 'A-Z_')
+            export CARGO_TARGET_${t}_LINKER=rust-lld
             cargo build --release --locked --target ${{ matrix.target }}
             mkdir -p out && cp target/${{ matrix.target }}/release/tabasm out/
             cp target/${{ matrix.target }}/release/tab1to2 out/
             file out/tabasm
+            # A wrong-architecture or dynamically linked artifact is worse
+            # than a failed build, because it ships.
+            file out/tabasm | grep -q 'statically linked' \
+              || { echo 'not statically linked' >&2; exit 1; }
           else
             cargo build --release --locked
             mkdir -p out && cp target/release/tabasm.exe target/release/tab1to2.exe out/
           fi
 
       # A release binary that has not been tested is a guess. The suites are
-      # fast; run them on what is about to ship.
+      # fast; run them on what is about to ship. A cross-built binary cannot
+      # run here, so those are exercised under qemu after packaging instead.
       - name: Test
+        if: matrix.qemu == ''
         run: cargo test --release --locked
 
       - name: Package
@@ -117,12 +138,21 @@ jobs:
           # no instruction set and cannot assemble anything at all.
           cp -r tables "$dir"/
           cp README.md LICENSE NOTICE "$dir"/
-          mkdir -p "$dir/doc" && cp doc/table-format.md doc/table-format-legacy.md "$dir/doc"/
+          mkdir -p "$dir/doc"
+          cp doc/table-format.md doc/table-format-legacy.md doc/tabasm.1 "$dir/doc"/
 
           # Prove the packaged binary works from inside the package, rather
-          # than trusting that the copy went right.
+          # than trusting that the copy went right. A cross-built one runs
+          # under qemu, which is enough to catch a broken build or a missing
+          # table; it is not a substitute for the suites.
           printf '        .org 0\n        nop\n        .end\n' > "$dir/probe.asm"
-          ( cd "$dir" && TASMTABS=tables ./tabasm* --cpu z80 probe.asm probe.obj probe.lst )
+          if [ -n "${{ matrix.qemu }}" ]; then
+            sudo apt-get update -qq && sudo apt-get install -y -qq qemu-user-static
+            ( cd "$dir" && ${{ matrix.qemu }} ./tabasm --cpu z80 probe.asm probe.obj probe.lst )
+          else
+            ( cd "$dir" && TASMTABS=tables ./tabasm* --cpu z80 probe.asm probe.obj probe.lst )
+          fi
+          test -s "$dir/probe.obj" || { echo 'probe produced no object' >&2; exit 1; }
           rm -f "$dir"/probe.*
 
           if [ "${{ matrix.ext }}" = zip ]; then

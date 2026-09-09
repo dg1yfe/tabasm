@@ -1,0 +1,264 @@
+.TH TABASM 1 "September 2026" "tabasm 2026.9.1" "User Commands"
+.SH NAME
+tabasm \- table-driven cross-assembler for 8- and 16-bit microprocessors
+.SH SYNOPSIS
+.B tabasm
+.BI \-\-cpu " name"
+.RI [ options ]
+.I source
+.RI [ object
+.RI [ listing
+.RI [ export
+.RI [ symbol ]]]]
+.SH DESCRIPTION
+Two-pass absolute assembler.
+The instruction set is not compiled in: it is read at run time from a table
+file, one per processor.
+Adding a target means writing a table, not changing the program.
+.PP
+Only
+.I source
+is required.
+The other names default to the source base name \(em the source name truncated
+at its first dot, not its last \(em with
+.BR .obj ", " .lst ", " .exp " and " .sym .
+.PP
+Output is byte-compatible with the Telemark Assembler.
+See
+.B COMPATIBILITY
+below.
+.SH OPTIONS
+Option letters are case-insensitive, except
+.BR \-y .
+Values shown as
+.I xx
+are hexadecimal.
+Options and file names may be interleaved.
+.TP
+.BI \-\-cpu " name"
+Select the instruction table.
+.I name
+is the table's file name without extension: \fB\-\-cpu z80\fR reads
+.IR z80.tab2 .
+Required.
+.TP
+.BI \-a xx
+Strict-check mask.
+Bare
+.B \-a
+sets all bits.
+Default 06.
+.TP
+.B \-b
+Binary object output and block mode.
+Equivalent to
+.BR "\-g3 \-c" .
+.TP
+.B \-c
+Block mode.
+A counter change does not split the object into separate records.
+.TP
+.BI \-d " name"
+Define
+.IR name ,
+as
+.B #define
+would.
+.TP
+.B \-e
+List macro lines in expanded form rather than as written.
+.TP
+.BI \-f xx
+Fill byte for locations the source never writes.
+.TP
+.BI \-g n
+Object format.
+0 Intel HEX, 1 MOS Technology, 2 Motorola S-record, 3 raw binary,
+4 Intel HEX with word addresses.
+Default 0.
+.TP
+.B \-h
+Append a hex dump to the listing.
+.TP
+.B \-i
+Fold case in symbol names.
+.TP
+.B \-l
+Append the label table.
+.B \-ll
+prints the long form,
+.B \-la
+prints all labels.
+.TP
+.B \-m
+MOS Technology object format.
+Same as
+.BR \-g1 .
+.TP
+.BI \-o xx
+Bytes per object record.
+Default 18 (24 decimal).
+.TP
+.BI \-p n
+Page length in lines, decimal.
+Pages the listing.
+.TP
+.B \-q
+Suppress the listing.
+.TP
+.B \-s
+Write the symbol file.
+.TP
+.BI \-x d
+Instruction class mask, one hex digit.
+Bare
+.B \-x
+enables all classes.
+Default 1.
+.TP
+.B \-y
+Print elapsed time and line count.
+.TP
+.B \-z
+Write a trace to standard error.
+Its content is not a stable interface.
+.TP
+.B \-\-compatibility
+Restore two behaviours of the original: expressions evaluate left to right with
+no operator precedence, and
+.B .UNDEF
+does nothing.
+.TP
+.B \-\-bug\-compatibility
+Restore two defects the original had: the
+.B \-g4
+checksum is computed from the byte address while the record prints the word
+address, and the symbol list is sorted by an algorithm that stops early.
+.TP
+.BI \-\-message\-prefix " name"
+Name on the assembler's own messages.
+Default
+.BR tabasm .
+.TP
+.BI \-\-page\-title " text"
+Heading for a paged listing when the source sets none.
+Default
+.BR tabasm .
+.SH TABLES
+A table is looked for in these places, first hit winning:
+.IP 1. 4
+.BR $TASMTABS ,
+which names one directory.
+.IP 2. 4
+The working directory.
+.IP 3. 4
+.I tables/
+beside the executable.
+.IP 4. 4
+.I ../share/tabasm/tables
+relative to the executable.
+.I /usr/local/bin/tabasm
+therefore finds
+.IR /usr/local/share/tabasm/tables .
+.IP 5. 4
+.IR $XDG_DATA_HOME/tabasm/tables ,
+or
+.I ~/.local/share/tabasm/tables
+when that is unset.
+.IP 6. 4
+.IR /usr/local/share/tabasm/tables ,
+then
+.IR /usr/share/tabasm/tables .
+.PP
+Two file names are tried in each directory:
+.IB name .tab2
+first, then
+.IB tasm name .tab
+for a table in the older format.
+If none is found, the error lists every path tried.
+.SH ENVIRONMENT
+.TP
+.B TASMTABS
+One directory to search for tables.
+Not a path list.
+.TP
+.B TASMOPTS
+Options appended to the command line.
+.TP
+.B TASMERRFORMAT
+Format for diagnostics.
+Takes four conversions in this order: %s file, %d line, %s message, %s detail.
+Anything else is rejected with a warning and the built-in layout is used,
+which is equivalent to
+.BR "%s line %04d: %s %s" .
+.SH EXIT STATUS
+.TP
+.B 0
+No errors.
+.TP
+.B 1
+Assembly completed with errors.
+.TP
+.B 2
+Out of memory.
+.TP
+.B 3
+A file could not be opened.
+.TP
+.B 4
+Fatal internal error.
+.SH COMPATIBILITY
+tabasm is an independent reimplementation of the Telemark Assembler (TASM),
+first released in 1985.
+Its output matches the 2001 release byte for byte across 363 compared
+artefacts.
+.PP
+Two of the original's defects are corrected by default.
+.B \-\-bug\-compatibility
+restores them.
+Two behaviours changed between original versions;
+.B \-\-compatibility
+selects the older.
+To reproduce the original exactly:
+.PP
+.RS
+.EX
+tabasm \-\-compatibility \-\-bug\-compatibility \-\-message\-prefix tasm \\
+       \-\-cpu 8051 prog.asm
+.EE
+.RE
+.PP
+The legacy
+.BI \- nn
+and
+.BI \-t name
+table selectors still work, undocumented.
+.SH EXAMPLES
+Assemble for the Z80, Motorola S-record output:
+.PP
+.RS
+.EX
+tabasm \-\-cpu z80 \-g2 firmware.asm firmware.s19
+.EE
+.RE
+.PP
+Raw binary, filling gaps with FF, with a label table:
+.PP
+.RS
+.EX
+tabasm \-\-cpu 6303 \-b \-fff \-l firmware.asm firmware.bin
+.EE
+.RE
+.SH FILES
+.TP
+.I *.tab2
+Instruction table.
+.TP
+.I *.tab
+Instruction table, older format.
+.SH SEE ALSO
+.BR tab1to2 (1)
+converts a table from the older format.
+.PP
+.I /usr/share/doc/tabasm/table-format.md
+describes the table format.
