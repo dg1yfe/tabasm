@@ -191,8 +191,15 @@ jobs:
             tabasm-*.zip
           if-no-files-found: error
 
-  publish:
-    name: checksums and publish
+  # The release is left as a draft. Publishing is a deliberate act by a person
+  # who has looked at what was built:
+  #
+  #     gh release edit v<version> --draft=false
+  #
+  # Nothing here can un-draft it, so a bad build cannot become a published
+  # release by itself.
+  checksums:
+    name: checksums
     needs: build
     if: github.event_name == 'push'
     runs-on: ubuntu-latest
@@ -207,7 +214,10 @@ jobs:
           gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber SHA256SUMS
         env:
           GH_TOKEN: ${{ github.token }}
-      - name: Publish
-        run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+      - name: Say what is waiting
+        run: |
+          echo "Draft release $TAG is ready for review:"
+          gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json url -q .url
+          echo "Publish it with: gh release edit $TAG --repo $GITHUB_REPOSITORY --draft=false"
         env:
           GH_TOKEN: ${{ github.token }}
