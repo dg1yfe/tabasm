@@ -44,6 +44,8 @@ fn survives_table(name: &str, table: &str, body: &str) {
         .env("TASMTABS", &scratch.0)
         .args(["--cpu=hostile", "t.asm", "a.obj", "a.lst"]);
     let out = cmd.output().expect("run");
+    // Where signals exist, a signal is the failure. Elsewhere the assertion is
+    // that it ran to completion at all.
     #[cfg(unix)]
     {
         use std::os::unix::process::ExitStatusExt;
@@ -54,7 +56,8 @@ fn survives_table(name: &str, table: &str, body: &str) {
             out.status.signal()
         );
     }
-    let _ = out;
+    #[cfg(not(unix))]
+    assert!(out.status.code().is_some(), "{}: did not exit normally", name);
 }
 
 #[test]
