@@ -27,6 +27,10 @@ pub struct Macro {
 pub struct Macros {
     pub list: Vec<Macro>,
     pub overflowed: bool,
+    /// Index of the macro `DEFINE` last touched, which is what `DEFCONT`
+    /// extends. It is not simply the last element: redefining an existing
+    /// macro replaces it where it already sits.
+    last: Option<usize>,
 }
 
 impl Macros {
@@ -34,6 +38,7 @@ impl Macros {
         Macros {
             list: Vec::new(),
             overflowed: false,
+            last: None,
         }
     }
 
@@ -82,6 +87,7 @@ impl Macros {
                 params,
                 body,
             };
+            self.last = Some(i);
             return None;
         }
         // 10.1: overflow here is NOT fatal -- the macro is dropped and the run
@@ -95,12 +101,20 @@ impl Macros {
             params,
             body,
         });
+        self.last = Some(self.list.len() - 1);
         None
     }
 
     /// `.DEFCONT <text>` appends to the most recently defined macro.
     pub fn defcont(&mut self, text: &str) -> Option<&'static str> {
-        match self.list.last_mut() {
+        // The macro DEFINE last touched, not the last in the list. Redefining
+        // an existing macro leaves it where it was, and on the second pass
+        // every macro already exists -- so keying on list order appended the
+        // continuation to an unrelated macro in pass 2 while getting it right
+        // in pass 1. The two passes then disagreed about how much code the
+        // macro produced, which surfaces as misaligned labels rather than as
+        // anything pointing at the macro.
+        match self.last.and_then(|i| self.list.get_mut(i)) {
             Some(m) => {
                 m.body.push_str(text.trim_start());
                 None
@@ -113,6 +127,8 @@ impl Macros {
     pub fn undef(&mut self, name: &str) {
         if let Some(i) = self.position(name) {
             self.list.remove(i);
+            // Every later index has shifted; DEFCONT has nothing to extend.
+            self.last = None;
         }
     }
 

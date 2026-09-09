@@ -92,7 +92,7 @@ for the same mnemonic can never match and is rejected as unreachable.
 
 ## Encoding rules
 
-Rules the eleven shipped tables use are marked; the rest are implemented and
+Rules the twelve shipped tables use are marked; the rest are implemented and
 selectable, but nothing here exercises them.
 
 | Rule | Parameters | Used by a shipped table |

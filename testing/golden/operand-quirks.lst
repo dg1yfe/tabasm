@@ -1,0 +1,22 @@
+0001   0000             ; Two things about operand text that only real source tends to reach.
+0002   0000             ;
+0003   0000             ; Whitespace is stripped from an operand before it is matched -- but not
+0004   0000             ; inside a quoted character, where the space IS the value. Closing up the gap
+0005   0000             ; would leave the quote itself as the character.
+0006   0000             ;
+0007   0000             ; `%` introduces a binary constant. Where no binary digit follows it, the
+0008   0000             ; prefix contributes nothing and the value after it is taken instead. That is
+0009   0000             ; what makes `#%NAME` work when NAME is a macro expanding to a parenthesised
+0010   0000             ; expression rather than to digits.
+0011   0000                     .org  0
+0012   0000             #define BIT   (1 << 2)
+0013   0000             #define BITS  0101
+0014   0000             
+0015   0000 C6 20               ldab  #' '              ; the space, $20
+0016   0002 C6 41               ldab  #'A'
+0017   0004 C6 05               ldab  #%BITS            ; binary 0101 = 5
+0018   0006 C6 04               ldab  #%BIT             ; the % contributes nothing: (1 << 2) = 4
+0019   0008 C6 04               ldab  #BIT
+0020   000A 05 04 05            .byte %101, %(1 << 2), %5
+0021   000D                     .end
+tabasm: Number of errors = 0

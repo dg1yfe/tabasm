@@ -457,7 +457,18 @@ impl<'a> Eval<'a> {
             }
             b'%' => {
                 self.pos += 1;
-                Some(self.radix(2))
+                // 3.4: `%` introduces a binary constant. Where no binary digit
+                // follows, the original does not reject the expression -- the
+                // prefix contributes nothing and the value after it is taken
+                // instead. That is what makes `#%NAME` work when NAME is a
+                // macro expanding to `(1 << 2)` rather than to digits, which
+                // real source does rely on.
+                match self.peek() {
+                    Some(b'0') | Some(b'1') => Some(self.radix(2)),
+                    Some(_) => self.primary(),
+                    // Nothing follows at all: unchanged, radix reports it.
+                    None => Some(self.radix(2)),
+                }
             }
             b'@' => {
                 self.pos += 1;

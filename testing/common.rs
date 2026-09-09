@@ -64,6 +64,24 @@ fn local_copy(source: &str, scratch: &Scratch) -> String {
     if from != to {
         std::fs::copy(&from, &to).unwrap_or_else(|e| panic!("copy {}: {}", from.display(), e));
     }
+    // A case that includes another file needs that file beside it. Only
+    // siblings are followed, and only one level: enough for a case that pins
+    // how an include is listed, and no more.
+    if let Ok(text) = std::fs::read_to_string(&from) {
+        for line in text.lines() {
+            let t = line.trim_start();
+            if t.len() < 9 || !t[..9].eq_ignore_ascii_case("#include ") {
+                continue;
+            }
+            let inc = t[9..].trim().trim_matches('"');
+            if inc.is_empty() || inc.contains('/') {
+                continue;
+            }
+            if let Some(dir) = from.parent() {
+                let _ = std::fs::copy(dir.join(inc), scratch.path(inc));
+            }
+        }
+    }
     name
 }
 

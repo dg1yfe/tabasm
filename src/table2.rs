@@ -205,6 +205,7 @@ pub fn parse(text: &str, selector: &str) -> Result<Table, LoadError> {
     let mut t = Table::new(selector);
     t.regmark = REG;
     t.wildcard = EXPR as char;
+    t.v2 = true;
     // v2 states the transform per row, so there is no table-level step.
     t.noargshift = true;
     let mut columns: Option<Vec<String>> = None;
@@ -652,7 +653,7 @@ mod tests {
 
     /// The round trip: load each shipped table, render it, parse the result, and
     /// require the two `Table` values to be equivalent. Rendering and parsing
-    /// must be exact inverses over all 2811 rows.
+    /// must be exact inverses over all 3028 rows.
     #[test]
     fn every_shipped_table_survives_a_round_trip_through_v2() {
         for sel in TABLES {

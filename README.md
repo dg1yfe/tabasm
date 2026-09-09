@@ -1,7 +1,7 @@
 # tabasm
 
 A table-driven, two-pass, absolute cross-assembler for 8- and early-16-bit
-microprocessors. Eleven targets are supported out of the box, and adding another
+microprocessors. Twelve targets are supported out of the box, and adding another
 usually means writing a table rather than changing the program.
 
 tabasm is an independent reimplementation of the **Telemark Assembler (TASM)**,
@@ -40,6 +40,7 @@ tabasm --cpu z80 -g2 firmware.asm firmware.s19
 | `8048` | Intel 8048 |
 | `6502` | MOS 6502 |
 | `6800` | Motorola 6800, 6801, 68HC11 |
+| `6303` | Hitachi HD6303 (6801 superset) |
 | `6805` | Motorola 6805 |
 | `8051` | Intel 8051 |
 | `8085` | Intel 8080/8085 |
@@ -115,8 +116,8 @@ Four suites, no dependencies to install:
 
 - **unit tests** over the expression evaluator, the matcher, the encoding rules,
   the object writers and the table parsers;
-- **`testing/conformance.rs`** — whether the output is *right*. It sweeps all 2811
-  rows of the eleven tables, requiring each to be reachable and to encode as the
+- **`testing/conformance.rs`** — whether the output is *right*. It sweeps all 3028
+  rows of the twelve tables, requiring each to be reachable and to encode as the
   table declares; re-derives every object checksum rather than remembering it;
   cross-checks the object file against the listing; and checks the documented
   expression values. It shares no code with `src/` on purpose;

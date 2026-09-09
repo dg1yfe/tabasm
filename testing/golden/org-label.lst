@@ -1,0 +1,15 @@
+0001   0000             ; A label on a .ORG line takes the address the counter is moved TO, not the
+0002   0000             ; one it is leaving. That is the only reading that makes such a label useful:
+0003   0000             ; it names the start of the block being placed.
+0004   0000             ;
+0005   0000             ; The listing shows the new address on that line too, while .BLOCK -- which
+0006   0000             ; also moves the counter -- lists the address before the move.
+0007   0000                     .org  0
+0008   0000 01                  nop
+0009   0001 01                  nop
+0010   0002 01                  nop
+0011   0100             start   .org  $100
+0012   0100 01                  nop
+0013   0101 00 01               .word start             ; $0100, not $0003
+0014   0103                     .end
+tabasm: Number of errors = 0

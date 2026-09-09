@@ -1,0 +1,13 @@
+0001   0000             ; A trailing comma closes a list rather than introducing one more, empty,
+0002   0000             ; argument. An empty argument anywhere else IS a zero, so exactly one is
+0003   0000             ; dropped, from the end, and only when something precedes it.
+0004   0000                     .org  0
+0005   0000 01 02 03            .byte 1,2,3,            ; three bytes
+0006   0003 04 05 06            .byte 4,5,6             ; three bytes
+0007   0006 07 00 08            .byte 7,,8              ; three: the gap is a zero
+0008   0009 00 01 02            .byte ,1,2              ; three: a leading gap is a zero too
+0009   000C 09 00               .byte 9,,                ; two: 09 00
+0010   000E 34 12               .word $1234,            ; one word
+0011   0010 61 62               .text "ab",             ; two bytes
+0012   0012                     .end
+tabasm: Number of errors = 0

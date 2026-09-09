@@ -1,0 +1,13 @@
+0001   0000             ; An INCLUDE is listed before the file it pulls in, so the listing reads in
+0002   0000             ; the order the source is read, and the included lines carry a depth marker in
+0003   0000             ; column 11. The marker is 1-based: the file named on the command line is
+0004   0000             ; depth 1 and unmarked, its includes are depth 2 and marked `+`.
+0005   0000                     .org  0
+0006   0000 01                  nop
+0007   0001             #include "include-listing-inc.asm"
+0001+  0001             ; Included by include-listing.asm; not a case of its own.
+0002+  0001 C6 01               ldab  #1
+0003+  0003 01                  nop
+0008   0004 01                  nop
+0009   0005                     .end
+tabasm: Number of errors = 0

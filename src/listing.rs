@@ -55,7 +55,7 @@ pub fn line(
         "{:04}{}{:04X}{}{:<12}",
         lineno,
         depth_marker(depth),
-        pc & 0xFFFF,
+        pc,
         if skipped { '~' } else { ' ' },
         bytes_field(bytes)
     )
@@ -67,12 +67,16 @@ pub fn line(
 /// than four bytes. 9.1: it repeats the source line number, shows the
 /// advancing address, and leaves the source column empty -- and, unlike the
 /// first line, its byte field is NOT padded out to 12 columns.
+/// The address is printed unmasked. A program counter that runs past 0xFFFF
+/// -- a vector table ending exactly at 0x10000, say -- prints as five digits
+/// and pushes the source column right by one, which is what the original does
+/// rather than wrapping the display to 0000.
 pub fn continuation(lineno: u32, depth: usize, pc: u32, bytes: &[u8]) -> String {
     format!(
         "{:04}{}{:04X} {}",
         lineno,
         depth_marker(depth),
-        pc & 0xFFFF,
+        pc,
         bytes_field(bytes)
     )
     .to_uppercase()

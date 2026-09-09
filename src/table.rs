@@ -119,6 +119,10 @@ pub struct Table {
     /// The character an `ARGS` pattern uses for a register-set slot. v1 spells
     /// it `!`; v2 uses a sentinel that cannot occur in source operand text.
     pub regmark: u8,
+    /// True when the table was read in the current format. `.ADDINSTR` states
+    /// its row in the legacy spelling whatever the table is, so it has to know
+    /// which one it is adding to.
+    pub v2: bool,
     /// How many auxiliary registers the target has, for 7.20's `arp_val`.
     ///
     /// v1 cannot state this: the original decides it by string-comparing the
@@ -176,6 +180,7 @@ impl Table {
             noargshift: false,
             wildcard: '*',
             regmark: b'!',
+            v2: false,
             // 7.20: three bits for the C25, one for everything else.
             aux_registers: if selector == "3225" { 8 } else { 2 },
         }

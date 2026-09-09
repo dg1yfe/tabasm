@@ -28,10 +28,30 @@ pub struct Matched {
 /// wins, and scanning stops there. Row order is the language the table accepts.
 pub fn find(table: &Table, mnemonic: &str, operand: &str, class_mask: u32) -> Option<Matched> {
     let mnem = mnemonic.to_ascii_uppercase();
-    // 6.1: the matcher works on operand text with all whitespace removed.
+    // 6.1: the matcher works on operand text with whitespace removed -- but
+    // not inside a quoted character or string, where a space is the value
+    // itself. `ldab #' '` loads 0x20, not the quote that closing up the gap
+    // would leave behind.
+    let mut quote: Option<u8> = None;
     let orig: Vec<u8> = operand
         .bytes()
-        .filter(|b| !b.is_ascii_whitespace())
+        .filter(|b| {
+            match quote {
+                Some(q) => {
+                    if *b == q {
+                        quote = None;
+                    }
+                    return true;
+                }
+                None => {
+                    if *b == b'\'' || *b == b'"' {
+                        quote = Some(*b);
+                        return true;
+                    }
+                }
+            }
+            !b.is_ascii_whitespace()
+        })
         .collect();
     let upper: Vec<u8> = orig.iter().map(|b| b.to_ascii_uppercase()).collect();
 

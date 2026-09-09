@@ -32,13 +32,14 @@ const fn c(id: &'static str, args: &'static [&'static str], src: &'static str) -
     }
 }
 
-/// The eleven targets, each with the object formats. Breadth across processors
+/// The twelve targets, each with the object formats. Breadth across processors
 /// and encodings; `conformance.rs` supplies the depth.
 #[rustfmt::skip]
 const TARGETS: &[(&str, &str)] = &[
     ("8048", "--cpu=8048"),
     ("6502", "--cpu=6502"),
     ("6800", "--cpu=6800"),
+    ("6303", "--cpu=6303"),
     ("6805", "--cpu=6805"),
     ("8051", "--cpu=8051"),
     ("8085", "--cpu=8085"),
@@ -64,6 +65,13 @@ const FORMATS: &[(&str, &str)] = &[
 #[rustfmt::skip]
 const CASES: &[Case] = &[
     // Listing and object options, on one target to keep the corpus small.
+    // Behaviours found by assembling a real 6303 project, each of which the
+    // corpus had never reached.
+    c("multi-statement",     &["--cpu=6800"], "testing/cases/multi-statement.asm"),
+    c("org-label",           &["--cpu=6800"], "testing/cases/org-label.asm"),
+    c("list-trailing-comma", &["--cpu=6800"], "testing/cases/list-trailing-comma.asm"),
+    c("operand-quirks",      &["--cpu=6800"], "testing/cases/operand-quirks.asm"),
+    c("include-listing",     &["--cpu=6800"], "testing/cases/include-listing.asm"),
     c("opt-labels", &["--cpu=8051", "-l"], "testing/smoke/8051.asm"),
     c("opt-labels-long", &["--cpu=8051", "-ll"], "testing/smoke/8051.asm"),
     c("opt-labels-all", &["--cpu=8051", "-la"], "testing/smoke/8051.asm"),

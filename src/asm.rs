@@ -263,7 +263,11 @@ impl Asm {
             self.paging = true;
             self.eject = false;
             self.img.flush();
-            self.assemble_file(source, 0)?;
+            // 9.1: the depth marker is 1-based -- the source named on the
+            // command line is depth 1 and unmarked, its includes are depth 2
+            // and carry `+`. Starting at 0 shifted every marker down one, so
+            // the first level of include went unmarked.
+            self.assemble_file(source, 1)?;
             if !self.cond.is_empty() {
                 self.diag(msg::IMBALANCED_COND, None);
             }
@@ -336,19 +340,51 @@ impl Asm {
         // 3. Strip the comment.
         let code = strip_comment(&expanded, self.comment_char);
 
-        // 4-6. Split and dispatch. `\` separates statements on one line (4.1).
-        for stmt in split_statements(&code) {
-            self.statement(&stmt)?;
-        }
+        // 4-6. Split and dispatch. `\` separates statements on one line (4.1)
+        // -- except on a DEFINE, whose body runs to the end of the line with
+        // its backslashes intact. That is what a multiple-statement macro is:
+        // the body is stored as written and split where it is EXPANDED, not
+        // where it is defined. Splitting first truncates the body at the first
+        // `\` and assembles the remainder on the spot, which emits bytes from
+        // a directive that must emit none.
+        let stmts = if is_define(&code, self.comment_char, self.local_char) {
+            vec![code.clone()]
+        } else {
+            split_statements(&code)
+        };
 
-        self.list_line(&shown);
+        // Each statement is assembled and listed on its own. `emitted` is both
+        // the listing's byte column and the offset the encoder writes at, so
+        // letting it run on across a `\` puts the second statement's bytes at
+        // the wrong address and advances the counter by the running total
+        // rather than by what that statement produced. 9.1: the first
+        // statement carries the source text, the rest are continuation lines.
+        let mut source = Some(shown.as_str());
+        for stmt in stmts {
+            self.line_pc = self.pc;
+            self.emitted.clear();
+            // 4.8: an INCLUDE is listed before the file it pulls in, so the
+            // listing reads in the order the source is read. Every other
+            // statement is listed after it runs, because only then are its
+            // bytes known.
+            if is_include(&stmt, self.comment_char, self.local_char) {
+                self.list_line(source.take());
+                self.statement(&stmt)?;
+            } else {
+                self.statement(&stmt)?;
+                self.list_line(source.take());
+            }
+        }
         for d in std::mem::take(&mut self.pending) {
             self.push_lst(d);
         }
         Ok(())
     }
 
-    fn list_line(&mut self, shown: &str) {
+    /// `shown` is the source text for the first statement of a line and None
+    /// for any that follow it on the same line, which are listed as
+    /// continuations.
+    fn list_line(&mut self, shown: Option<&str>) {
         // 2.1: pass 1 emits nothing -- it only decides where everything lands.
         // The listing is produced in pass 2, alongside the bytes.
         if self.pass != 2 || self.o.quiet || !self.listing_on {
@@ -357,9 +393,16 @@ impl Asm {
         let skipped = self.skipping();
         let bytes = std::mem::take(&mut self.emitted);
         if !self.codes {
-            self.push_lst(listing::line_nocodes(shown));
+            // -c prints source without addresses or bytes, so a second
+            // statement on the line has nothing of its own to show.
+            if let Some(text) = shown {
+                self.push_lst(listing::line_nocodes(text));
+            }
             return;
         }
+        // A statement after a `\` is a full listing line with empty source
+        // text -- padded to the 24-column prefix -- not an overflow
+        // continuation, which is left unpadded.
         let first = bytes.len().min(listing::BYTES_PER_LINE);
         let l = listing::line(
             self.line_no,
@@ -367,7 +410,7 @@ impl Asm {
             self.line_pc,
             skipped,
             &bytes[..first],
-            shown,
+            shown.unwrap_or(""),
         );
         self.push_lst(l);
         // 9.1: continuation lines repeat the line number, advance the address
@@ -422,7 +465,12 @@ impl Asm {
 
         // 5. The label. 4.5: .EQU/.SET/= define the line's label themselves;
         // any other label takes the current counter.
-        let defines_own = is_directive && matches!(dname.as_str(), "EQU" | "SET" | "=");
+        // .ORG defines its own label too: the label takes the address the
+        // counter is being moved TO, not the one it is leaving. `isu_begin
+        // .ORG ISUOFS+$0200` names the start of the relocated block, which is
+        // the only reading that makes such a label useful.
+        let defines_own =
+            is_directive && matches!(dname.as_str(), "EQU" | "SET" | "=" | "ORG" | "*=" | "$=");
         if let Some(name) = label.clone() {
             if !defines_own {
                 self.define_label(&name, self.pc as i32);
@@ -510,6 +558,14 @@ impl Asm {
     /// the surplus is dropped and the run continues.
     fn split_args_checked(&mut self, operand: &str) -> Vec<String> {
         let mut v = split_args(operand);
+        // A trailing comma closes the list rather than introducing one more,
+        // empty, argument: `.db 1,2,3,` is three bytes. An empty argument
+        // anywhere else IS a zero -- `.db 7,,8` and `.db ,1,2` are both three
+        // bytes -- so exactly one is dropped, from the end, and only when
+        // something precedes it.
+        if v.len() > 1 && v.last().is_some_and(|a| a.trim().is_empty()) {
+            v.pop();
+        }
         if v.len() > MAX_ARGS {
             self.diag(msg::TOO_MANY_ARGS, None);
             v.truncate(MAX_ARGS);
@@ -720,6 +776,33 @@ fn strip_comment(line: &str, comment_char: u8) -> String {
         }
     }
     line.to_string()
+}
+
+/// True when a statement is an `INCLUDE` directive.
+fn is_include(stmt: &str, comment_char: u8, local_char: u8) -> bool {
+    let (_, mnem, _) = split_statement(stmt, comment_char, local_char);
+    if mnem.is_empty() || mnem.as_bytes()[0].is_ascii_alphabetic() {
+        return false;
+    }
+    mnem.trim_start_matches(['.', '#'])
+        .eq_ignore_ascii_case("INCLUDE")
+}
+
+/// True when the line's first statement is `DEFINE` or `DEFCONT`, whose
+/// operand is the rest of the line rather than one statement of it.
+fn is_define(code: &str, comment_char: u8, local_char: u8) -> bool {
+    let first = match split_statements(code).into_iter().next() {
+        Some(f) => f,
+        None => return false,
+    };
+    let (_, mnem, _) = split_statement(&first, comment_char, local_char);
+    // 4.2: a directive begins with a non-letter, and '.' and '#' are
+    // interchangeable.
+    if mnem.is_empty() || mnem.as_bytes()[0].is_ascii_alphabetic() {
+        return false;
+    }
+    let d = mnem.trim_start_matches(['.', '#']).to_ascii_uppercase();
+    d == "DEFINE" || d == "DEFCONT"
 }
 
 /// 4.1: `\` separates multiple statements on one line.
@@ -1020,6 +1103,11 @@ impl Asm {
                     self.img.flush();
                 }
                 self.pc = v;
+                // 4.5: the label on the line takes the NEW counter, which is
+                // why it is excluded from the generic label path above.
+                if let Some(l) = label {
+                    self.define_label(l, v as i32);
+                }
                 // The listing shows the address AFTER an .ORG -- golden 85.lst
                 // line 18 lists `.org 1000h` at 1000, not at the previous
                 // counter. .BLOCK, which also moves the counter, lists the
@@ -1163,7 +1251,21 @@ impl Asm {
                     if self.table.rows.len() >= MAX_TABLE_ROWS {
                         return Err(EXIT_FATAL);
                     }
-                    if let Some(row) = crate::table::parse_row(operand) {
+                    if let Some(mut row) = crate::table::parse_row(operand) {
+                        // 4.2: the directive's row is written in the legacy
+                        // spelling -- `*` for a value slot, `!` for a register
+                        // one -- because that is the only spelling it has ever
+                        // had. A current-format table marks those slots with
+                        // sentinels instead, so translate before adding, or the
+                        // `*` is matched as a literal asterisk and the row can
+                        // never fire. Legacy tables are left alone: there `*`
+                        // means whatever .ALTWILD last said it means.
+                        if self.table.v2 {
+                            row.args = row
+                                .args
+                                .replace('*', &self.table.wildcard.to_string())
+                                .replace('!', &(self.table.regmark as char).to_string());
+                        }
                         self.table.rows.push(row);
                     }
                 }

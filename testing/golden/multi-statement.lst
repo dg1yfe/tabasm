@@ -1,0 +1,37 @@
+0001   0000             ; `\` as a statement separator, and what it means inside a macro.
+0002   0000             ;
+0003   0000             ; The manual calls the backslash a newline: the rest of the line is processed
+0004   0000             ; as an independent statement. Coupled with DEFINE that is how a multiple
+0005   0000             ; statement macro is written, so the body must keep its backslashes and be
+0006   0000             ; split where it is EXPANDED, not where it is defined. Splitting first
+0007   0000             ; truncates the body and assembles the tail on the spot -- which emits bytes
+0008   0000             ; from a directive that emits none.
+0009   0000             ;
+0010   0000             ; Each statement is also listed on its own line, at its own address, and the
+0011   0000             ; bytes are counted per statement: a running total would place the second
+0012   0000             ; statement wrongly and advance the counter twice over.
+0013   0000                     .org  0
+0014   0000             
+0015   0000             ; Two statements on one plain source line.
+0016   0000 C6 05               ldab  #5 \ nop
+0016   0002 01          
+0017   0003             
+0018   0003             ; A macro whose body is two statements.
+0019   0003             #define TWO   ldab #6 \ nop
+0020   0003 C6 06               TWO
+0020   0005 01          
+0021   0006             
+0022   0006             ; DEFCONT extends the macro DEFINE last touched. Redefining a macro leaves it
+0023   0006             ; where it already sits in the table, and on the second pass every macro
+0024   0006             ; already exists -- so keying on table order appends the continuation to
+0025   0006             ; whichever macro happens to be last. LATER is defined after PAIR precisely to
+0026   0006             ; catch that: without it the bug is invisible.
+0027   0006             #define PAIR  ldab #7
+0028   0006             #defcont      \ nop
+0029   0006             #define LATER nop
+0030   0006 C6 07               PAIR
+0030   0008 01          
+0031   0009 01                  LATER
+0032   000A             
+0033   000A                     .end
+tabasm: Number of errors = 0
