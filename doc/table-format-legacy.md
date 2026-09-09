@@ -2,7 +2,9 @@
 
 tabasm reads two table formats. This is the older one, used by TASM, kept because
 existing tables are written in it. The current format is described in
-`table-format.md`; `tab1to2` converts between them.
+`table-format.md`; `tab1to2` converts between them. It is built from the
+source repository rather than shipped in the binary release, because the
+assembler reads either format directly.
 
 The format is chosen by the file's **content**, not its name: a table whose first
 substantive line is `%format` is read as the current format, anything else as this

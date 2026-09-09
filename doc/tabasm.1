@@ -257,8 +257,12 @@ Instruction table.
 .I *.tab
 Instruction table, older format.
 .SH SEE ALSO
-.BR tab1to2 (1)
-converts a table from the older format.
+.I table-format.md
+describes the table format,
+.I table-format-legacy.md
+the older one.
 .PP
-.I /usr/share/doc/tabasm/table-format.md
-describes the table format.
+.B tab1to2
+rewrites a legacy table in the current format.
+It is built from the source repository and is not part of the binary release;
+the assembler reads legacy tables as they are.

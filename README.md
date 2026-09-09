@@ -30,6 +30,11 @@ tap*, which points at the formula rather than at the trust setting.
 Homebrew is macOS only here. On Linux, take the release tarball — the builds
 are statically linked and run on any distribution.
 
+The release archives carry the assembler alone. `tab1to2`, which rewrites a
+legacy table in the current format, is built from this repository; the
+assembler reads legacy tables directly, so converting one is a choice rather
+than a requirement.
+
 ## Building
 
 ```
@@ -74,7 +79,7 @@ error lists every path tried.
 To install from a release archive:
 
 ```
-sudo cp tabasm tab1to2 /usr/local/bin/
+sudo cp tabasm /usr/local/bin/
 sudo mkdir -p /usr/local/share/tabasm && sudo cp -r tables /usr/local/share/tabasm/
 sudo cp doc/tabasm.1 /usr/local/share/man/man1/
 ```

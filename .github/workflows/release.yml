@@ -98,12 +98,10 @@ jobs:
             cargo build --release --locked --target aarch64-apple-darwin
             cargo build --release --locked --target x86_64-apple-darwin
             mkdir -p out
-            for b in tabasm tab1to2; do
-              lipo -create -output "out/$b" \
-                "target/aarch64-apple-darwin/release/$b" \
-                "target/x86_64-apple-darwin/release/$b"
-              lipo -info "out/$b"
-            done
+            lipo -create -output out/tabasm \
+              target/aarch64-apple-darwin/release/tabasm \
+              target/x86_64-apple-darwin/release/tabasm
+            lipo -info out/tabasm
           elif [ -n "${{ matrix.target }}" ]; then
             rustup target add ${{ matrix.target }}
             # rust-lld links every musl target without a cross toolchain,
@@ -115,7 +113,6 @@ jobs:
             export CARGO_TARGET_${t}_LINKER=rust-lld
             cargo build --release --locked --target ${{ matrix.target }}
             mkdir -p out && cp target/${{ matrix.target }}/release/tabasm out/
-            cp target/${{ matrix.target }}/release/tab1to2 out/
             file out/tabasm
             # A dynamically linked artifact is worse than a failed build,
             # because it ships and then fails on the user's machine. Test for
@@ -127,7 +124,7 @@ jobs:
             fi
           else
             cargo build --release --locked
-            mkdir -p out && cp target/release/tabasm.exe target/release/tab1to2.exe out/
+            mkdir -p out && cp target/release/tabasm.exe out/
           fi
 
       # A release binary that has not been tested is a guess. The suites are
@@ -143,6 +140,10 @@ jobs:
           ver=$(sed -n 's/^version *= *"\(.*\)"/\1/p' Cargo.toml | head -1)
           dir="tabasm-$ver-${{ matrix.name }}"
           mkdir -p "$dir"
+          # The assembler only. tab1to2 converts a legacy table to the current
+          # format, which is optional -- the assembler reads legacy tables
+          # directly -- and it is nearly half the payload. It stays in the
+          # source repository for anyone who wants it.
           cp out/* "$dir"/
           # The tables are not optional extras: without them the binary knows
           # no instruction set and cannot assemble anything at all.
