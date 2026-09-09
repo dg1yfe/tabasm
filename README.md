@@ -9,6 +9,27 @@ a table-driven cross-assembler first released in 1985. It reproduces TASM's
 output byte for byte where asked to, corrects two of its defects by default, and
 adds a table format that says what it means.
 
+## Installing
+
+Binaries for Linux, macOS and Windows are attached to each
+[release](https://github.com/dg1yfe/tabasm/releases), with a `SHA256SUMS` to
+check them against. Unpack and run, or install with the commands under
+*Where the tables are found* below.
+
+On macOS, via Homebrew:
+
+```
+brew trust dg1yfe/tap
+brew install dg1yfe/tap/tabasm
+```
+
+The first line is not optional: Homebrew 6 refuses to load formulae from a
+third-party tap until it is trusted, and the failure reports *invalid syntax in
+tap*, which points at the formula rather than at the trust setting.
+
+Homebrew is macOS only here. On Linux, take the release tarball — the builds
+are statically linked and run on any distribution.
+
 ## Building
 
 ```
