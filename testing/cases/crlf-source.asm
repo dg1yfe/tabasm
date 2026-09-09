@@ -17,7 +17,8 @@
 ; Every construct below has its last token at end of line, which is where the
 ; CR lands.
 ;
-; Documented in the findings log section 5.7.
+; A source file written on Windows must assemble to the same bytes as the
+; same file written on Unix. That is what this case pins.
         .org 0
 
 start:  nop

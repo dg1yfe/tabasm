@@ -17,16 +17,17 @@
 0017   0000             ; Every construct below has its last token at end of line, which is where the
 0018   0000             ; CR lands.
 0019   0000             ;
-0020   0000             ; Documented in the findings log section 5.7.
-0021   0000                     .org 0
-0022   0000             
-0023   0000 00          start:  nop
-0024   0001 74 05               mov  a,#5
-0025   0003 01 02 03            .byte 1,2,3
-0026   0006 34 12               .word 1234h
-0027   0008 63 72 6C 66         .text "crlf"
-0028   000C             value   .equ 42
-0029   000C 74 2A               mov  a,#value
-0030   000E 80 F0               sjmp start
-0031   0010                     .end
+0020   0000             ; A source file written on Windows must assemble to the same bytes as the
+0021   0000             ; same file written on Unix. That is what this case pins.
+0022   0000                     .org 0
+0023   0000             
+0024   0000 00          start:  nop
+0025   0001 74 05               mov  a,#5
+0026   0003 01 02 03            .byte 1,2,3
+0027   0006 34 12               .word 1234h
+0028   0008 63 72 6C 66         .text "crlf"
+0029   000C             value   .equ 42
+0030   000C 74 2A               mov  a,#value
+0031   000E 80 F0               sjmp start
+0032   0010                     .end
 tabasm: Number of errors = 0

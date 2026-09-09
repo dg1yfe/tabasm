@@ -872,7 +872,7 @@ mod diagnostics {
     }
 
     /// Hostile input: the v2 parser is a trust boundary reading outside data,
-    /// exactly as the v1 loader is (the robustness suite).
+    /// exactly as the v1 loader is (testing/robustness.rs).
     #[test]
     fn hostile_tables_are_rejected_rather_than_crashing() {
         for body in [

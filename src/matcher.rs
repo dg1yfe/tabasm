@@ -1,4 +1,9 @@
 //! Matching a source line against the instruction table.
+//!
+//! Rows are tried in table order, and the first row whose mnemonic and operand
+//! pattern both match wins -- so a table orders its rows from most specific to
+//! least. The class mask carries the -x style switches, which enable or
+//! suppress whole groups of rows.
 
 use crate::limits::MAX_ARGS;
 use crate::table::{Row, Table};

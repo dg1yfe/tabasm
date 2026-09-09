@@ -20,7 +20,7 @@ path = "src/bin/tab1to2.rs"
 
 [profile.release]
 opt-level = 2
-# Deliberately NOT panic = "abort". The robustness suite treats an abort as a
+# Deliberately NOT panic = "abort". testing/robustness.rs treats an abort as a
 # crash, so the binary must unwind rather than SIGABRT if a panic ever escapes.
 panic = "unwind"
 

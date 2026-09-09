@@ -1,6 +1,6 @@
 # Build wrapper for the test harness.
 #
-# The harness and the robustness suite expect an executable at src/tabasm built
+# Some harnesses expect an executable at src/tabasm built
 # by `make -C src`. The cargo project itself lives at the repository root in
 # the idiomatic layout (Cargo.toml + src/*.rs); this Makefile only drives it
 # and drops the binary where the harness looks.

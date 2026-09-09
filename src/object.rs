@@ -1,4 +1,7 @@
 //! Object file formats.
+//!
+//! Five of them, all fed from the same regions: Intel HEX, Intel HEX with word
+//! addresses, MOS Technology, Motorola S-record, and raw binary.
 
 use crate::cli::ObjFormat;
 use crate::image::Region;

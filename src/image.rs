@@ -1,4 +1,8 @@
-//! The memory image and the object regions cut from it (2.3 & 2.5).
+//! The memory image and the object regions cut from it.
+//!
+//! The image is a flat 64 KB array with a written/unwritten flag per byte; a
+//! region is a maximal run of written bytes, and regions are what the object
+//! writers turn into records.
 
 use crate::limits::IMAGE_SIZE;
 
@@ -37,8 +41,8 @@ impl Image {
     }
 
     /// Write one byte. Returns false if the address lies outside the image, in
-    /// which case the byte is DROPPED -- 2.3 is explicit that it is neither
-    /// wrapped nor truncated. The caller decides whether to diagnose, using
+    /// which case the byte is DROPPED -- it is neither wrapped
+    /// nor truncated. The caller decides whether to diagnose, using
     /// `reported_out_of_range` to keep it to one per run.
     pub fn write(&mut self, addr: u32, byte: u8) -> bool {
         if addr as usize >= IMAGE_SIZE {

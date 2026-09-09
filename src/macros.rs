@@ -1,4 +1,8 @@
-//! Macros (4.7). Textual substitution, not symbols.
+//! Macros: textual substitution, not symbols.
+//!
+//! A macro is expanded by rewriting the source line before it is matched, so a
+//! macro can supply a mnemonic, an operand or any fragment of either. Because
+//! expansion can produce further macro calls, it repeats to a bounded depth.
 
 use crate::limits::*;
 

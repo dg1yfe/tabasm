@@ -1,4 +1,4 @@
-//! Diagnostics (9.5, 10.3).
+//! Diagnostics.
 //!
 //! 2.6: diagnostics go to standard output AND into the listing, never to
 //! standard error. Standard error carries only the debug trace and warnings
@@ -9,7 +9,7 @@
 /// the text: three of these are padded to 34 columns and the rest are not,
 /// and several exist in both an upper- and a lower-case form because the
 /// original raised them from different sites.
-#[allow(dead_code)] // three alternate-site messages; see the findings log
+#[allow(dead_code)] // three messages the assembler can raise at a second site
 pub mod msg {
     // Symbols
     pub const LABEL_NOT_FOUND: &str = "Label not found:";

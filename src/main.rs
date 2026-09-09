@@ -1,9 +1,9 @@
 //! tabasm -- a clean-room reimplementation of the TASM cross-assembler.
 //!
-//! Built from the specification alone. See AGENTS.md: no part of this descends from the
-//! original implementation's source or binaries.
+//! Written from a behavioural specification alone: no part of this descends
+//! from the original implementation's source or binaries.
 
-#![allow(dead_code)] // exit codes and the message catalogue are kept complete; see the findings log
+#![allow(dead_code)] // the exit codes and message catalogue are kept complete
 
 mod asm;
 mod cli;
@@ -40,10 +40,10 @@ pub fn prog(o: &Options) -> &str {
     &o.message_prefix
 }
 
-/// The acceptance criteria: the two-line identification banner is the one
-/// thing excluded from the standard-output comparison, precisely so that a
-/// clean-room reimplementation prints its own identification instead of the
-/// original's. Keep it to two lines; the harness skips exactly that many.
+/// The two-line identification banner is the one thing excluded when output is
+/// compared against the original's, precisely so that a clean-room
+/// reimplementation prints its own identification rather than inheriting
+/// someone else's. Keep it to two lines: the comparison skips exactly that many.
 ///
 /// This deliberately does NOT follow --report-compatibility. That flag exists
 /// to keep compared output byte-identical, and the banner is the one thing

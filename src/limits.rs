@@ -1,10 +1,10 @@
-//! Capacities and exit codes (1.8).
+//! Capacities and exit codes.
 //!
-//! The original derived these from fixed-size C arrays. We are not obliged to
-//! allocate that way, but 10-limits.md is explicit that a reimplementation
-//! "should still diagnose at least as early, because source that silently
-//! assembles in one build and fails in another is worse than either". So the
-//! limits are enforced as policy rather than inherited from the storage.
+//! The original derived these from fixed-size C arrays. Growable storage means
+//! we need not allocate that way, but the limits are still enforced, and at
+//! the same thresholds: source that silently assembles in one build and fails
+//! in another is worse than either outcome alone. So they are policy here
+//! rather than a property of the storage.
 
 // --- exit codes (1.8) -------------------------------------------------------
 pub const EXIT_OK: i32 = 0; // assembly completed, no errors

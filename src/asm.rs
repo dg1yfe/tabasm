@@ -1,4 +1,8 @@
-//! The two-pass assembler (the specification).
+//! The two-pass assembler.
+//!
+//! Pass one assigns addresses and defines symbols; pass two re-evaluates every
+//! expression with the symbol table complete, then emits bytes, listing and
+//! diagnostics. Directives live here; instruction encoding is in `rules`.
 
 use crate::cli::{ObjFormat, Options};
 use crate::errlog::{msg, Format};
@@ -655,7 +659,7 @@ impl Asm {
 
         // Significant bits the instruction discards. 1.4 says this is gated on
         // -a bit 0x02, but err-undef is assembled with no -a at all and its
-        // golden carries the diagnostic -- see the findings log
+        // golden carries the diagnostic.
         // A negative value is sign-extended, and those high bits are not
         // "unused data" -- test96.asm's backward `lcall` produces a negative
         // 16-bit displacement whose top half is all ones, and the corpus

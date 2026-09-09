@@ -641,12 +641,12 @@ impl Enc {
     }
 }
 
-// --- 7.25: rules no shipped table selects ----------------------------------
+// --- rules no shipped table selects ----------------------------------------
 //
-// "They are described from the code alone; treat any implementation as
-// unverified." Nothing in the corpus reaches these, so nothing here is
-// validated by the acceptance run -- they are written to the spec's prose and
-// recorded as unverified in the findings log.
+// These are reachable only through .ADDINSTR, which lets a source file add a
+// table row at assembly time. No shipped table selects them and no test case
+// exercises them, so unlike every other rule here they rest on the written
+// description alone. Treat them as unverified.
 
 impl Enc {
     /// TMS9900. With two operands the first becomes a byte-swapped 16-bit

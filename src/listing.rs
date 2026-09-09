@@ -1,4 +1,4 @@
-//! Listing layout (9.1-9.4).
+//! Listing layout.
 //!
 //! The line is a fixed 24-character prefix followed by the source text
 //! exactly as written:

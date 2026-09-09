@@ -1,4 +1,7 @@
-//! The symbol table (3.7, the specification).
+//! The symbol table.
+//!
+//! Each symbol carries a value and a segment, and the segment is what lets a
+//! label be told from an equate in the printed symbol list.
 
 use crate::limits::*;
 

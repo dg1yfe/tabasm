@@ -1,7 +1,7 @@
 //! Expression evaluation, in both modes.
 //!
-//! 3.9 is emphatic that values are 32 bits wide and that an implementation
-//! must fix that width explicitly rather than inherit the host's word: a build
+//! Values are 32 bits wide, and that width is fixed here explicitly rather
+//! than inherited from the host word. It matters: a build that let it follow
 //! that let them follow a 64-bit `long` printed a negative label as
 //! FFFFFFFFFFFFFFF9 where the original printed FFFFFFF9, and that was the only
 //! difference across 363 compared artefacts. Hence i32/u32 throughout, with

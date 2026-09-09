@@ -1,4 +1,8 @@
-//! The `.tab` instruction-table format.
+//! The legacy `.tab` instruction-table format.
+//!
+//! Positional columns, with the argument byte count derived rather than
+//! stated. `table2` reads the current format; both produce the same `Table`.
+//! See doc/table-format-legacy.md.
 
 use crate::limits::*;
 

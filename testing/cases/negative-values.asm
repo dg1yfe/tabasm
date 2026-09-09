@@ -9,7 +9,7 @@
 ; label table produced by -l. An LP64 build that let these follow "long" listed
 ; a negative label as FFFFFFFFFFFFFFF9 where the original produced FFFFFFF9.
 ; That was the single difference across 363 artefacts compared against the 2001
-; release binary; see the reference comparison.
+; release binary.
 ;
         .org  0
 

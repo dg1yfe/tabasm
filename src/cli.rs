@@ -1,4 +1,8 @@
 //! Command line, environment and file naming.
+//!
+//! Options come from the environment first and the command line second, so the
+//! command line wins. Output names are derived from the source name when they
+//! are not given.
 
 use crate::limits::*;
 
@@ -92,7 +96,7 @@ impl Default for Options {
 
 /// Parse a leading run of hex digits, returning 0 for an empty field. Values
 /// are bounded rather than allowed to overflow: a 200-digit opcode field is one
-/// of the hostile inputs the robustness suite feeds us.
+/// of the hostile inputs testing/robustness.rs feeds us.
 fn hex(s: &str) -> u32 {
     let mut v: u32 = 0;
     for c in s.chars() {
