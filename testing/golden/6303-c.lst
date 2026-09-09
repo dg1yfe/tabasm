@@ -1,0 +1,32 @@
+0001   0000             ; HD6303 smoke test.
+0002   0000             ;
+0003   0000             ; Short on purpose: a handful of instructions that need no operand evaluation,
+0004   0000             ; every data directive, a label and an equate. Its value is breadth across the
+0005   0000             ; targets and the object formats, not depth -- testing/conformance.rs covers
+0006   0000             ; every table row.
+0007   0000             ;
+0008   0000             ; The last four are what the HD6303 adds to the 6801; MUL and ABX are the
+0009   0000             ; 6801's own additions to the 6800, which this table also carries.
+0010   0000                     .org  0
+0011   0000             val     .equ  $12
+0012   0000 01 02 03            .byte 1,2,3
+0013   0003 34 12               .word $1234
+0014   0005 73 6D 6F 6B         .text "smoke"
+0014   0009 65 
+0015   000A 1B                  ABA   
+0016   000B 48                  ASLA  
+0017   000C 11                  CBA   
+0018   000D 0C                  CLC   
+0019   000E 3A                  ABX   
+0020   000F 3D                  MUL   
+0021   0010 18                  XGDX  
+0022   0011 1A                  SLP   
+0023   0012 71 0F 12            AIM   #$0F,val
+0024   0015 72 80 12            OIM   #$80,val
+0025   0018 75 01 12            EIM   #$01,val
+0026   001B 7B 10 12            TIM   #$10,val
+0027   001E 04          here:   .byte 4
+0028   001F                     .block 4
+0029   0023 12                  .byte val
+0030   0024                     .end
+tabasm: Number of errors = 0
