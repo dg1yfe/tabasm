@@ -175,7 +175,9 @@ jobs:
       - name: Upload to the draft
         if: github.event_name == 'push'
         shell: bash
-        run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber tabasm-*.tar.gz tabasm-*.zip
+        # Only the extension this platform produces: gh treats a pattern that
+        # matches nothing as an error, so naming both fails everywhere.
+        run: gh release upload "$TAG" --repo "$GITHUB_REPOSITORY" --clobber tabasm-*.${{ matrix.ext }}
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -186,9 +188,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.name }}
-          path: |
-            tabasm-*.tar.gz
-            tabasm-*.zip
+          path: tabasm-*.${{ matrix.ext }}
           if-no-files-found: error
 
   # The release is left as a draft. Publishing is a deliberate act by a person
