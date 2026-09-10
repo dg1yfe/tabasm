@@ -457,17 +457,25 @@ impl<'a> Eval<'a> {
             }
             b'%' => {
                 self.pos += 1;
-                // 3.4: `%` introduces a binary constant. Where no binary digit
-                // follows, the original does not reject the expression -- the
-                // prefix contributes nothing and the value after it is taken
-                // instead. That is what makes `#%NAME` work when NAME is a
-                // macro expanding to `(1 << 2)` rather than to digits, which
-                // real source does rely on.
+                // 3.2: `%` introduces a binary constant, and is NOT symmetric
+                // with `$`, which becomes the counter when no hex digit
+                // follows. A `%` with no binary digit is an empty binary
+                // constant: diagnosed, yielding 0.
+                //
+                // --compatibility restores the original evaluation semantic --
+                // the prefix contributes nothing and the value after it is
+                // taken, so `%5` is 5 and `%(1<<2)` is 4. Real source relies on
+                // that, writing `#%NAME` where NAME expands to `(1 << 2)`.
                 match self.peek() {
                     Some(b'0') | Some(b'1') => Some(self.radix(2)),
-                    Some(_) => self.primary(),
-                    // Nothing follows at all: unchanged, radix reports it.
-                    None => Some(self.radix(2)),
+                    _ if self.compat => match self.peek() {
+                        Some(_) => self.primary(),
+                        None => Some(self.radix(2)),
+                    },
+                    _ => {
+                        self.err(msg::NO_BINARY_DIGIT, None);
+                        Some(0)
+                    }
                 }
             }
             b'@' => {

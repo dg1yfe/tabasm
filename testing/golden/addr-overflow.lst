@@ -1,0 +1,17 @@
+0001   0000             ; Emission past the top of the image.
+0002   0000             ;
+0003   0000             ; The counter is not clamped: .ORG and the counter hold any value. A byte whose
+0004   0000             ; address exceeds $FFFF is wrapped to 16 bits and still emitted, so the run
+0005   0000             ; stays one object record rather than splitting -- five bytes from $FFFC is a
+0006   0000             ; five-byte record at FFFC. The listing shows the counter unmasked, five digits,
+0007   0000             ; which pushes the source column right by one.
+0008   0000             ;
+0009   0000             ; By default the first out-of-range address is diagnosed, once per run.
+0010   0000             ; --bug-compatibility restores the original's silence. Assembled both ways.
+0011   FFFC                     .org  $FFFC
+0012   FFFC 01 00 02 00         .dw   1,2
+addr-overflow.asm line 0013: Address outside memory image. (10000)
+0013   10000 01                  nop
+0014   10001 01                  nop
+0015   10002                     .end
+tabasm: Number of errors = 1

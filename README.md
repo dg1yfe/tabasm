@@ -6,8 +6,8 @@ usually means writing a table rather than changing the program.
 
 tabasm is an independent reimplementation of the **Telemark Assembler (TASM)**,
 a table-driven cross-assembler first released in 1985. It reproduces TASM's
-output byte for byte where asked to, corrects two of its defects by default, and
-adds a table format that says what it means.
+output byte for byte where asked to, corrects several of its defects by default,
+and adds a table format that says what it means.
 
 ## Prebuilt binaries
 
@@ -145,13 +145,15 @@ tabasm --compatibility --bug-compatibility --message-prefix tasm --cpu 8051 x.as
 
 | switch | restores |
 |---|---|
-| `--compatibility` | no operator precedence, so `1+2*3+4` is 13, not 11; `.UNDEF` does nothing |
-| `--bug-compatibility` | the `-g4` checksum taken from the byte address while the record prints the word address; the symbol sort that stops early |
+| `--compatibility` | no operator precedence, so `1+2*3+4` is 13, not 11; `.UNDEF` does nothing; a `%` with no binary digit absorbed, taking the value after it |
+| `--bug-compatibility` | the `-g4` checksum taken from the byte address while the record prints the word address; the symbol sort that stops early; no diagnostic for a byte past `$FFFF` |
 | `--message-prefix`, `--page-title` | the name on messages and the paged-listing heading |
 
-The two defects are corrected by default: `-g4` records that disagree with their
-own address fail validation in any conforming Intel HEX loader, and a symbol
-list is sorted lexically.
+Corrected by default: `-g4` records that disagree with their own address fail
+validation in any conforming Intel HEX loader; a symbol list is sorted
+lexically; a `%` with no binary digit is an empty binary constant and is
+diagnosed; and a byte emitted past `$FFFF` is reported once. Such a byte is
+still written, wrapped to 16 bits, in either mode.
 
 `tabasm --help` lists the options; `man tabasm` is the full reference; `doc/`
 covers both table formats. There is no `-h` for help — `-h` is the hex dump, as

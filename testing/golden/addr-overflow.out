@@ -1,0 +1,5 @@
+tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm: pass 1 complete.
+addr-overflow.asm line 0013: Address outside memory image. (10000)
+tabasm: pass 2 complete.
+tabasm: Number of errors = 1

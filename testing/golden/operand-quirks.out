@@ -1,4 +1,6 @@
 tabasm 2026.9.2 -- table-driven cross-assembler.
 tabasm: pass 1 complete.
+operand-quirks.asm line 0024: No binary digit after % radix prefix. 
+operand-quirks.asm line 0025: No binary digit after % radix prefix. 
 tabasm: pass 2 complete.
-tabasm: Number of errors = 0
+tabasm: Number of errors = 2

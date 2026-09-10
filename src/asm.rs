@@ -177,9 +177,16 @@ impl Asm {
         if self.pass == 2 {
             let mut a = self.byte_addr().wrapping_add(self.emitted.len() as u32);
             for b in bytes {
-                if !self.img.write(a, *b) && !self.img.reported_out_of_range {
+                // 2.3: the byte is written either way, wrapped to 16 bits. Only
+                // the diagnostic is conditional, once per run, and the original
+                // raised none at all -- so --bug-compatibility restores that
+                // silence. The detail is the unwrapped address.
+                if !self.img.write(a, *b)
+                    && !self.img.reported_out_of_range
+                    && !self.o.bug_compatibility
+                {
                     self.img.reported_out_of_range = true;
-                    self.diag(msg::OUTSIDE_IMAGE, None);
+                    self.diag(msg::OUTSIDE_IMAGE, Some(format!("{:X}", a)));
                 }
                 a = a.wrapping_add(1);
             }
@@ -580,6 +587,11 @@ impl Asm {
     }
 
     fn eval(&mut self, text: &str) -> i32 {
+        // 3.6: whitespace is removed from an operand before evaluation, so
+        // `.byte 3 4` is the single byte 0x22 and `1+2 4` is 25. Inside a
+        // quoted character or string a space is the value and is kept, which is
+        // what makes `#' '` the character 0x20.
+        let text = &strip_operand_whitespace(text);
         let pc = self.pc as i32;
         let compat = self.o.compatibility;
         let lc = self.local_char;
@@ -771,6 +783,33 @@ fn strip_comment(line: &str, comment_char: u8) -> String {
         }
     }
     line.to_string()
+}
+
+/// 3.6: remove whitespace from an operand, except inside a quoted character or
+/// string. The matcher does the same to instruction operands (6.1); this covers
+/// the expressions a directive evaluates.
+fn strip_operand_whitespace(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut quote: Option<char> = None;
+    for c in s.chars() {
+        match quote {
+            Some(q) => {
+                out.push(c);
+                if c == q {
+                    quote = None;
+                }
+            }
+            None => {
+                if c == '\'' || c == '"' {
+                    quote = Some(c);
+                    out.push(c);
+                } else if !c.is_whitespace() {
+                    out.push(c);
+                }
+            }
+        }
+    }
+    out
 }
 
 /// True when a statement is an `INCLUDE` directive.
@@ -1033,16 +1072,24 @@ impl Asm {
             "WORD" | "DW" => {
                 let mut bytes = Vec::new();
                 for a in self.split_args_checked(operand) {
-                    let v = self.eval(a.trim()) as u32;
+                    // Each argument is evaluated once per emitted byte, not
+                    // once per argument, so an expression that diagnoses does
+                    // so twice: `.dw nolabel` reports Label not found twice,
+                    // and `.dw a,b` reports four times, in argument order. The
+                    // values are the same for any expression without side
+                    // effects, which is every expression here -- only the
+                    // diagnostics double.
+                    let first = self.eval(a.trim()) as u32;
+                    let second = self.eval(a.trim()) as u32;
                     // 4.11: byte order follows the SOURCE .LSFIRST/.MSFIRST,
                     // which is a different setting from the table directive of
                     // the same name -- that one governs opcodes.
                     if self.ls_first {
-                        bytes.push((v & 0xFF) as u8);
-                        bytes.push(((v >> 8) & 0xFF) as u8);
+                        bytes.push((first & 0xFF) as u8);
+                        bytes.push(((second >> 8) & 0xFF) as u8);
                     } else {
-                        bytes.push(((v >> 8) & 0xFF) as u8);
-                        bytes.push((v & 0xFF) as u8);
+                        bytes.push(((first >> 8) & 0xFF) as u8);
+                        bytes.push((second & 0xFF) as u8);
                     }
                 }
                 self.emit_and_advance(&bytes);

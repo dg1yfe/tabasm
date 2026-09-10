@@ -124,16 +124,21 @@ Write a trace to standard error.
 Its content is not a stable interface.
 .TP
 .B \-\-compatibility
-Restore two behaviours of the original: expressions evaluate left to right with
-no operator precedence, and
+Restore three behaviours of the original: expressions evaluate left to right
+with no operator precedence,
 .B .UNDEF
-does nothing.
+does nothing, and a
+.B %
+with no binary digit after it is absorbed, the value following it being taken.
 .TP
 .B \-\-bug\-compatibility
-Restore two defects the original had: the
+Restore three defects the original had: the
 .B \-g4
 checksum is computed from the byte address while the record prints the word
-address, and the symbol list is sorted by an algorithm that stops early.
+address, the symbol list is sorted by an algorithm that stops early, and a byte
+emitted past
+.B 0xFFFF
+draws no diagnostic.
 .TP
 .B \-\-help
 Print the options and exit.
@@ -221,10 +226,10 @@ first released in 1985.
 Its output matches the 2001 release byte for byte across 363 compared
 artefacts.
 .PP
-Two of the original's defects are corrected by default.
+Several of the original's defects are corrected by default;
 .B \-\-bug\-compatibility
 restores them.
-Two behaviours changed between original versions;
+Where its evaluation semantics changed between versions,
 .B \-\-compatibility
 selects the older.
 To reproduce the original exactly:

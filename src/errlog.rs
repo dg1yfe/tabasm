@@ -49,6 +49,9 @@ pub mod msg {
     pub const NO_INDIRECTION: &str = "Invalid operand.  No indirection for this instruction.";
     pub const RANGE_ARP: &str = "Range of ARP argument exceeded.";
     pub const OUTSIDE_IMAGE: &str = "Address outside memory image.";
+    /// 3.2: `%` where a value is expected but no binary digit follows.
+    /// Diagnosed by default; --compatibility takes the value instead.
+    pub const NO_BINARY_DIGIT: &str = "No binary digit after % radix prefix.";
     pub const SHORT_BYTE_COUNT: &str = "Table entry byte count is less than the opcode size.";
 
     // Directives and structure

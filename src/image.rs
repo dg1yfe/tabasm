@@ -40,17 +40,22 @@ impl Image {
         }
     }
 
-    /// Write one byte. Returns false if the address lies outside the image, in
-    /// which case the byte is DROPPED -- it is neither wrapped
-    /// nor truncated. The caller decides whether to diagnose, using
-    /// `reported_out_of_range` to keep it to one per run.
+    /// Write one byte. An address past the end of the image is **wrapped to 16
+    /// bits** and the byte is still written; returns false so the caller can
+    /// diagnose the first such address, using `reported_out_of_range` to keep
+    /// it to one per run.
+    ///
+    /// 2.3: the region keeps the *unwrapped* address, so a run that crosses
+    /// `0xFFFF` stays one record rather than splitting -- `.org $FFFC` then five
+    /// bytes is a single five-byte record at FFFC. Only the image index wraps.
     pub fn write(&mut self, addr: u32, byte: u8) -> bool {
-        if addr as usize >= IMAGE_SIZE {
-            return false;
-        }
-        self.mem[addr as usize] = byte;
-        self.lo = Some(self.lo.map_or(addr, |l| l.min(addr)));
-        self.hi = Some(self.hi.map_or(addr, |h| h.max(addr)));
+        let in_range = (addr as usize) < IMAGE_SIZE;
+        let idx = (addr as usize) % IMAGE_SIZE;
+        self.mem[idx] = byte;
+        // The watermarks describe the image, so they take the wrapped address.
+        let w = idx as u32;
+        self.lo = Some(self.lo.map_or(w, |l| l.min(w)));
+        self.hi = Some(self.hi.map_or(w, |h| h.max(w)));
 
         match &mut self.cur {
             Some(r) if r.start + r.bytes.len() as u32 == addr => r.bytes.push(byte),
@@ -62,7 +67,7 @@ impl Image {
                 });
             }
         }
-        true
+        in_range
     }
 
     /// 2.3: a read outside the image returns 0.

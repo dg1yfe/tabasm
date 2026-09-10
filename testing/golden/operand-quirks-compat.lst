@@ -21,9 +21,7 @@
 0021   0008 22                  .byte 3 4               ; whitespace removed: one byte, 0x22
 0022   0009 19                  .byte 1+2 4             ; likewise 1+24 = 25
 0023   000A 61 20 62            .byte "a b"             ; kept inside a string
-operand-quirks.asm line 0024: No binary digit after % radix prefix. 
-0024   000D C6 00               ldab  #%BIT             ; no binary digit: diagnosed by default
-operand-quirks.asm line 0025: No binary digit after % radix prefix. 
-0025   000F 00                  .byte %5                ; likewise
+0024   000D C6 04               ldab  #%BIT             ; no binary digit: diagnosed by default
+0025   000F 05                  .byte %5                ; likewise
 0026   0010                     .end
-tabasm: Number of errors = 2
+tabasm: Number of errors = 0

@@ -71,6 +71,13 @@ const CASES: &[Case] = &[
     c("org-label",           &["--cpu=6800"], "testing/cases/org-label.asm"),
     c("list-trailing-comma", &["--cpu=6800"], "testing/cases/list-trailing-comma.asm"),
     c("operand-quirks",      &["--cpu=6800"], "testing/cases/operand-quirks.asm"),
+    // Past $FFFF: the byte is wrapped and still emitted. Diagnosed once by
+    // default, silent under --bug-compatibility, as the original was.
+    c("addr-overflow", &["--cpu=6800"], "testing/cases/addr-overflow.asm"),
+    c("addr-overflow-bugcompat", &["--cpu=6800", "--bug-compatibility"], "testing/cases/addr-overflow.asm"),
+    // The same source under --compatibility: a % with no binary digit is
+    // absorbed and the value after it taken, as the original did.
+    c("operand-quirks-compat", &["--cpu=6800", "--compatibility"], "testing/cases/operand-quirks.asm"),
     c("include-listing",     &["--cpu=6800"], "testing/cases/include-listing.asm"),
     c("opt-labels", &["--cpu=8051", "-l"], "testing/smoke/8051.asm"),
     c("opt-labels-long", &["--cpu=8051", "-ll"], "testing/smoke/8051.asm"),
