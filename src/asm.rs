@@ -454,11 +454,6 @@ impl Asm {
                 && matches!(dname.as_str(), "IF" | "IFDEF" | "IFNDEF" | "ELSE" | "ENDIF")
             {
                 self.conditional(&dname, &operand);
-            } else if is_directive && matches!(dname.as_str(), "IF" | "IFDEF" | "IFNDEF") {
-                self.cond.push(Cond {
-                    active: false,
-                    taken: true,
-                });
             }
             return Ok(());
         }
@@ -994,7 +989,11 @@ impl Asm {
                 };
                 self.cond.push(Cond {
                     active: want,
-                    taken: want,
+                    // A level opened inside a skip counts as already taken, so
+                    // that no branch of it can ever open. Recording it untaken
+                    // would let its own ELSE invert to active and resume
+                    // assembly inside a region an enclosing level excluded.
+                    taken: want || !outer,
                 });
             }
             "ELSE" => match self.cond.last_mut() {

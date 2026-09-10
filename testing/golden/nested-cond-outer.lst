@@ -1,0 +1,38 @@
+0001   0000             ; A conditional nested inside the skipped branch of another must stay inert.
+0002   0000             ; Its own #ELSE must not re-open assembly that the enclosing level excluded:
+0003   0000             ; a level opened while skipping counts as already taken, so no branch of it
+0004   0000             ; can ever fire.
+0005   0000             ;
+0006   0000             ; Assembled three ways -- -dOUTER, -dINNER and neither -- which take the
+0007   0000             ; outer, middle and innermost branch in turn. The middle and innermost cases
+0008   0000             ; pass even without that rule; only the outer one catches the defect.
+0009   0000             #IFDEF OUTER
+0010   0000             #DEFINE VAL 1
+0011   0000~            #ELSE
+0012   0000~            #IFDEF INNER
+0013   0000~            #DEFINE VAL 2
+0014   0000~            #ELSE
+0015   0000~            #DEFINE VAL 3
+0016   0000~            #ENDIF
+0017   0000             #ENDIF
+0018   0000             
+0019   0000             ; A second level of nesting, and an #IFNDEF, in a branch that is skipped.
+0020   0000             #IFDEF OUTER
+0021   0000             #DEFINE DEPTH 0
+0022   0000~            #ELSE
+0023   0000~            #IFNDEF INNER
+0024   0000~            #IFDEF NOPE
+0025   0000~            #DEFINE DEPTH 1
+0026   0000~            #ELSE
+0027   0000~            #DEFINE DEPTH 2
+0028   0000~            #ENDIF
+0029   0000~            #ELSE
+0030   0000~            #DEFINE DEPTH 3
+0031   0000~            #ENDIF
+0032   0000             #ENDIF
+0033   0000             
+0034   0100                     .org  $100
+0035   0100 86 01               ldaa  #VAL
+0036   0102 C6 00               ldab  #DEPTH
+0037   0104                     .end
+tabasm: Number of errors = 0

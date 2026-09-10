@@ -78,6 +78,11 @@ const CASES: &[Case] = &[
     c("opt-hex", &["--cpu=8051", "-h"], "testing/smoke/8051.asm"),
     // --help prints and stops. -h is the hex dump above and stays that way.
     c("opt-help", &["--help"], "testing/smoke/8051.asm"),
+    // A conditional nested in a skipped branch must stay inert; only the
+    // -dOUTER case catches it going wrong.
+    c("nested-cond-outer", &["--cpu=6800", "-dOUTER"], "testing/cases/nested-conditionals.asm"),
+    c("nested-cond-inner", &["--cpu=6800", "-dINNER"], "testing/cases/nested-conditionals.asm"),
+    c("nested-cond-none", &["--cpu=6800"], "testing/cases/nested-conditionals.asm"),
     c("opt-paged", &["--cpu=8051", "-p20"], "testing/smoke/8051.asm"),
     c("opt-quiet", &["--cpu=8051", "-q"], "testing/smoke/8051.asm"),
     c("opt-expand", &["--cpu=8051", "-e"], "testing/smoke/8051.asm"),
