@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 tabasm: pass 1 complete.
 err-range.asm line 0005: Range of relative branch exceeded. 
 tabasm: pass 2 complete.

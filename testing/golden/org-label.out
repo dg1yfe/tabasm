@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 tabasm: pass 1 complete.
 tabasm: pass 2 complete.
 tabasm: Number of errors = 0

@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 tabasm: pass 1 complete.
 err-undef.asm(4): Label not found: (no_such_label)
 err-undef.asm(4): Unused data in MS byte of argument. (200)

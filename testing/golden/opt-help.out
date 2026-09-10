@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 
 usage: tabasm --cpu <name> [options] source [object [listing [export [symbol]]]]
 

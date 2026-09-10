@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 arg-checks.asm line 0011: Duplicate label: (dup)
 tabasm: pass 1 complete.
 arg-checks.asm line 0012: Unused data in MS byte of argument. (ab)

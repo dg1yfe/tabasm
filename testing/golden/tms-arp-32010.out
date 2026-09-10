@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 tabasm: pass 1 complete.
 tms-arp-width.asm line 0034: Range of argument exceeded. (2)
 tms-arp-width.asm line 0041: Range of ARP argument exceeded. (5)

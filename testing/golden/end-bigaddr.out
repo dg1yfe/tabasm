@@ -1,4 +1,4 @@
-tabasm 2026.9.2 -- table-driven cross-assembler.
+tabasm 2026.9.3 -- table-driven cross-assembler.
 tabasm: pass 1 complete.
 end-bigaddr.asm line 0009: END address out of range. (12345h)
 tabasm: pass 2 complete.
